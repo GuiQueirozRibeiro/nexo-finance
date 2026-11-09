@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "generate:pdf": "npx --yes md-to-pdf docs/guilhermeribeiro_typescriptparadesenvolvimentofrontend_pd.md"
   },
   "dependencies": {
     "clsx": "^2.1.1",

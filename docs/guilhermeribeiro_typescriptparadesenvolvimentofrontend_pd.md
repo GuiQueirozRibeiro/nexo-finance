@@ -20,10 +20,10 @@ O objetivo técnico central é demonstrar a construção de um módulo front-end
 A estrutura em `src/` isola regras de negócio e contratos de tipos de qualquer acoplamento visual:
 
 - **`src/core/` (Camada Core):** Implementa a mônada funcional `Either<L, R>` (`Left` e `Right`), a hierarquia orientada a objetos de falhas (`Failure`, `ValidationFailure`, `OpenFinanceFailure`, `PixGatewayFailure`), o contrato genérico `IUseCase<SuccessType, Params>`, `NoParams`, `Enums` (`AppFlavor`, `TransactionCategory`, `InstitutionCode`, `ThemeMode`), utilitários avançados de tipos (*Mapped Types*, *Conditional Types*, *Type Guards* para `unknown` e `assertNever`), o gerenciador `FlavorConfig`, o gerenciador de temas `ThemeManager` (persistência de tema `SYSTEM`/`DARK`/`LIGHT` em `localStorage` com alternância automática entre as logos `EXIMIA-FAVICON2.png` e `EXIMIA-FAVICON1.png`), o cliente `FirebaseClientManager` (autenticação Firebase Auth e sincronização Cloud Firestore no projeto `nexo-eximiatech`) e o gerenciador PWA `PwaServiceWorkerManager`.
-- **`src/domain/` (Camada Domain):** Contém as entidades orientadas a objetos (`Transaction`, `BankAccount`, `PixKeyValidator`, `PierreFinancialEngine`), tuplas financeiras, interfaces segregadas de repositório (`ITransactionRepository`, `IOpenFinanceRepository`, `IPixGatewayRepository`) e os 7 *UseCases* da aplicação.
-- **`src/data/` (Camada Data):** Implementa `TransactionModel` e `BankAccountModel` (estendendo as entidades de domínio com `fromUnknown`, `toJson`, `copyWith` e `toEntity`), os *DataSources* (`FinanceLocalDataSourceImpl` sincronizado com Cloud Firestore e `PixGatewayDataSourceImpl`) e os *Repositories* concretos, além do Route Handler `/api/asaas/pix`.
+- **`src/domain/` (Camada Domain):** Contém as entidades orientadas a objetos das 6 tabelas relacionais (`BankAccount`, `Transaction`, `CreditCardAccount`, `CostCenterBudget`, `RecurringSubscription`, `RegisteredPixKey`, `PixKeyValidator`, `PierreFinancialEngine`), tuplas financeiras, interfaces segregadas de repositório (`ITransactionRepository`, `IOpenFinanceRepository`, `IPixGatewayRepository`) e os 7 *UseCases* da aplicação.
+- **`src/data/` (Camada Data):** Implementa `TransactionModel` e `BankAccountModel` (estendendo as entidades de domínio com `fromUnknown`, `toJson`, `copyWith` e `toEntity`), os *DataSources* (`FinanceLocalDataSourceImpl` persistindo as 6 tabelas no `localStorage` e sincronizando com Cloud Firestore, e `PixGatewayDataSourceImpl`) e os *Repositories* concretos, além dos Route Handlers `/api/asaas/pix`, `/api/connect-token` e `/api/open-finance/sync`.
 - **`src/legacy/` (Evolução e Refatoração):** Documenta e testa a migração de um script legado de conciliação financeira em JavaScript para TypeScript estrito (`RefactoredReconciliationService`).
-- **`src/presentation/` (Camada Presentation MVVM):** Contém o controlador `FinanceViewModel` em TypeScript puro e as telas minimalistas em React 19 + Next.js App Router (`/`, `/login`, `/portal` com fluxos guiados em *Wizard* passo a passo e `/arquitetura`).
+- **`src/presentation/` (Camada Presentation MVVM):** Contém o controlador `FinanceViewModel` em TypeScript puro e as telas minimalistas em React 19 + Next.js App Router (`/`, `/login`, `/portal` com 8 rotas dedicadas e fluxos guiados em *Wizard* passo a passo, widget Pluggy Connect oficial e `/arquitetura`).
 
 ---
 
@@ -98,6 +98,7 @@ npm install          # Instala dependências e pacotes @types/*
 npm run typecheck    # Validação estática de tipos (tsc --noEmit)
 npm run build:core   # Transpila core, domain, data e legacy para dist-core/ com Source Maps (.js.map)
 npm run lint         # ESLint estrito (regra no-explicit-any ativa)
-npm test             # Executa os 17 testes unitários no Vitest (core, domain, data, legacy e viewmodel)
+npm test             # Executa os 19 testes unitários no Vitest (core, domain, data, legacy e viewmodel)
+npm run generate:pdf # Gera o relatório acadêmico oficial em PDF (docs/guilhermeribeiro_typescriptparadesenvolvimentofrontend_pd.pdf)
 npm run dev          # Inicia a aplicação em http://localhost:3000
 ```
