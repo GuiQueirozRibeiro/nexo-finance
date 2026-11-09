@@ -723,7 +723,22 @@ export class FinanceViewModel {
       activePixCharge: null,
       lastPixReceipt: null,
       feedbackBanner:
-        'Todas as 6 tabelas foram restauradas para o cenário padrão e sincronizadas.',
+        'Todas as 6 tabelas foram restauradas para o cenário de demonstração e sincronizadas.',
+    });
+  }
+
+  /**
+   * Zera completamente a conta do usuário (Saldo R$ 0,00, sem transações ou cartões residuais)
+   * e persiste o estado limpo no Cloud Firestore.
+   */
+  public async resetAccountToZero(): Promise<void> {
+    this._localDataSource.resetToZero();
+    await this.loadDashboard();
+    this._emit({
+      activePixCharge: null,
+      lastPixReceipt: null,
+      feedbackBanner:
+        'Sua conta foi iniciada do zero com sucesso! Saldo R$ 0,00 e sincronizada no Cloud Firestore.',
     });
   }
 }

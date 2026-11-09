@@ -76,6 +76,10 @@ export class PixGatewayDataSourceImpl implements IPixGatewayDataSource {
               amount,
               status: 'CONFIRMED',
               qrPayload: tuple,
+              qrCodeDataUrl:
+                typeof rawData.qrCodeDataUrl === 'string'
+                  ? rawData.qrCodeDataUrl
+                  : undefined,
               provider:
                 rawData.provider === 'ASAAS_API'
                   ? 'ASAAS_API'
@@ -143,6 +147,11 @@ export class PixGatewayDataSourceImpl implements IPixGatewayDataSource {
                   : 'SANDBOX_SIMULATOR',
               processedAtIso: new Date().toISOString(),
             };
+          }
+        } else {
+          const errData: unknown = await response.json().catch(() => null);
+          if (isPlainRecord(errData) && hasStringField(errData, 'error')) {
+            throw new Error(errData.error);
           }
         }
       } catch {

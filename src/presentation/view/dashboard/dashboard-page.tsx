@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import QRCode from 'qrcode';
 import {
   AlertTriangle,
   ArrowDownLeft,
@@ -37,6 +38,8 @@ import {
 } from 'lucide-react';
 import {
   AppFlavor,
+  BRAZILIAN_BANKS,
+  type BrazilianBank,
   type DeepReadonly,
   FirebaseClientManager,
   InstitutionCode,
@@ -50,6 +53,7 @@ import {
   type FinanceViewState,
   createFinanceViewModel,
 } from '@/presentation/viewmodel/finance.viewmodel';
+import { CurrencyInput } from '../components/currency-input';
 import { NexoNavbar } from '../components/nexo-navbar';
 
 export type PortalTab =
@@ -116,17 +120,17 @@ export function DashboardPage({
   const [wizardStep, setWizardStep] = useState<number>(1);
 
   // Estado Wizard: Transferir PIX (3 passos)
-  const [pixTransferAmount, setPixTransferAmount] = useState('150');
+  const [pixTransferAmount, setPixTransferAmount] = useState('');
   const [pixKeyType, setPixKeyType] = useState<PixKeyType>('EMAIL');
-  const [pixKeyValue, setPixKeyValue] = useState('fornecedor@eximiatech.com.br');
-  const [pixRecipientName, setPixRecipientName] = useState(
-    'Exímia Cloud Services',
-  );
+  const [pixKeyValue, setPixKeyValue] = useState('');
+  const [pixRecipientName, setPixRecipientName] = useState('');
+  const [pixRecipientBank, setPixRecipientBank] = useState('Santander');
 
   // Estado Wizard: Cobrar PIX QR Code (2 passos)
-  const [pixChargeAmount, setPixChargeAmount] = useState('250');
-  const [pixChargeDesc, setPixChargeDesc] = useState('Consultoria Nexo');
+  const [pixChargeAmount, setPixChargeAmount] = useState('');
+  const [pixChargeDesc, setPixChargeDesc] = useState('');
   const [copiedQr, setCopiedQr] = useState(false);
+  const [clientQrDataUrl, setClientQrDataUrl] = useState('');
 
   // Estado Wizard: Novo Lançamento (3 passos)
   const [txType, setTxType] = useState<TransactionType>('EXPENSE');
@@ -136,20 +140,26 @@ export function DashboardPage({
     TransactionCategory.FOOD,
   );
   const [txInstitution, setTxInstitution] = useState<InstitutionCode>(
-    InstitutionCode.NUBANK,
+    InstitutionCode.ASAAS,
   );
 
-  // Estado Wizard: Conectar Novo Banco Open Finance (3 passos)
-  const [newBankInst, setNewBankInst] = useState<InstitutionCode>(
-    InstitutionCode.BRADESCO,
-  );
-  const [newBankNickname, setNewBankNickname] = useState(
-    'Bradesco Corporate PJ',
-  );
-  const [newBankCompe, setNewBankCompe] = useState('237');
-  const [newBankBranch, setNewBankBranch] = useState('2040');
-  const [newBankAccountNum, setNewBankAccountNum] = useState('1300984-2');
-  const [newBankInitialBalance, setNewBankInitialBalance] = useState('18500');
+  // Estado Wizard: Conectar Novo Banco Open Finance (3 passos com catálogo FEBRABAN)
+  const [selectedBrazilianBank, setSelectedBrazilianBank] =
+    useState<BrazilianBank>(() => BRAZILIAN_BANKS[0] ?? {
+      code: '033',
+      ispb: '90400888',
+      name: 'Banco Santander (Brasil) S.A.',
+      shortName: 'Santander',
+      color: '#EC0000',
+      popular: true,
+    });
+  const [bankSearchQuery, setBankSearchQuery] = useState('');
+  const [selectedBankFilter, setSelectedBankFilter] = useState<'POPULAR' | 'ALL'>('POPULAR');
+  const [newBankNickname, setNewBankNickname] = useState('');
+  const [newBankCompe, setNewBankCompe] = useState('033');
+  const [newBankBranch, setNewBankBranch] = useState('');
+  const [newBankAccountNum, setNewBankAccountNum] = useState('');
+  const [newBankInitialBalance, setNewBankInitialBalance] = useState('0');
 
   // Estado Wizard: Open Finance Gerenciar (2 passos)
   const [selectedBankId, setSelectedBankId] = useState<string | null>(
@@ -162,9 +172,9 @@ export function DashboardPage({
   );
   const [newCardBrand, setNewCardBrand] =
     useState<CardBrand>('MASTERCARD_BLACK');
-  const [newCardName, setNewCardName] = useState('Nubank Ultravioleta PJ');
-  const [newCardDigits, setNewCardDigits] = useState('7721');
-  const [newCardLimit, setNewCardLimit] = useState('35000');
+  const [newCardName, setNewCardName] = useState('');
+  const [newCardDigits, setNewCardDigits] = useState('');
+  const [newCardLimit, setNewCardLimit] = useState('1000');
   const [newCardClosing, setNewCardClosing] = useState('5');
   const [newCardDue, setNewCardDue] = useState('12');
 
@@ -243,6 +253,46 @@ export function DashboardPage({
     };
   }, [viewModel]);
 
+  // Sincroniza a imagem de QR Code em alta definição quando não fornecida pelo backend
+  useEffect(() => {
+    let isMounted = true;
+    const payload = state.activePixCharge?.qrPayload[0];
+    if (payload && !state.activePixCharge?.qrCodeDataUrl) {
+      void QRCode.toDataURL(payload, {
+        width: 320,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' },
+      })
+        .then((url) => {
+          if (isMounted) setClientQrDataUrl(url);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [state.activePixCharge]);
+
+  const activeQrCodeImage =
+    state.activePixCharge?.qrCodeDataUrl || clientQrDataUrl;
+
+  const filteredBanks = useMemo(() => {
+    const q = bankSearchQuery.trim().toLowerCase();
+    let list = BRAZILIAN_BANKS;
+    if (selectedBankFilter === 'POPULAR') {
+      list = list.filter((b) => b.popular);
+    }
+    if (q) {
+      list = BRAZILIAN_BANKS.filter(
+        (b) =>
+          b.name.toLowerCase().includes(q) ||
+          b.shortName.toLowerCase().includes(q) ||
+          b.code.includes(q),
+      );
+    }
+    return list;
+  }, [bankSearchQuery, selectedBankFilter]);
+
   const summary = state.summary;
   const userName = authUser?.displayName ?? 'Guilherme';
 
@@ -255,6 +305,39 @@ export function DashboardPage({
   const closeWizard = () => {
     setActiveWizard(null);
     setWizardStep(1);
+  };
+
+  const getWizardTitle = (wiz: ActiveWizard): string => {
+    switch (wiz) {
+      case 'transfer_pix':
+        return 'Transferência PIX Instantânea';
+      case 'charge_pix':
+        return 'Cobrança via QR Code PIX';
+      case 'connect_bank':
+        return 'Conectar Instituição Bancária (Open Finance)';
+      case 'new_transaction':
+        return 'Novo Lançamento';
+      case 'new_card':
+        return 'Novo Cartão Corporativo';
+      case 'card_purchase':
+        return 'Despesa no Cartão';
+      case 'card_manage':
+        return 'Gerenciar Cartão e Fatura';
+      case 'new_cost_center':
+        return 'Novo Centro de Custo';
+      case 'cost_budget':
+        return 'Definir Meta de Orçamento';
+      case 'new_subscription':
+        return 'Cadastrar Assinatura Recorrente';
+      case 'new_pix_key':
+        return 'Cadastrar Chave PIX';
+      case 'open_finance':
+        return 'Gerenciar Conta Open Finance';
+      case 'assistant':
+        return 'Diagnóstico e Relatório Financeiro';
+      default:
+        return 'Fluxo Guiado Passo a Passo';
+    }
   };
 
   const handleConfirmPixTransfer = async () => {
@@ -270,6 +353,9 @@ export function DashboardPage({
       description: 'Transferência PIX via Portal Nexo',
     });
     if (ok) {
+      setPixTransferAmount('');
+      setPixKeyValue('');
+      setPixRecipientName('');
       closeWizard();
     }
   };
@@ -314,21 +400,35 @@ export function DashboardPage({
   };
 
   const handleConnectNewBank = async () => {
+    const bank = selectedBrazilianBank;
     const ok = await viewModel.connectNewBankAccount({
-      id: `acc-${newBankInst.toLowerCase()}-${Date.now()}`,
-      institution: newBankInst,
-      nickname: newBankNickname.trim() || getInstitutionDisplayName(newBankInst),
+      id: `acc-${bank.code}-${Date.now()}`,
+      institution:
+        bank.code === '260'
+          ? InstitutionCode.NUBANK
+          : bank.code === '341'
+          ? InstitutionCode.ITAU
+          : bank.code === '077'
+          ? InstitutionCode.INTER
+          : bank.code === '237'
+          ? InstitutionCode.BRADESCO
+          : InstitutionCode.ASAAS,
+      nickname: newBankNickname.trim() || `${bank.shortName} Conta Corrente`,
       balance: Number(newBankInitialBalance) || 0,
       coordinates: [
-        newBankCompe.trim() || '001',
+        bank.code,
         newBankBranch.trim() || '0001',
-        newBankAccountNum.trim() || '00001-9',
+        newBankAccountNum.trim() || '12345-6',
       ],
       consentStatus: 'AUTHORIZED',
       lastSyncIso: new Date().toISOString(),
-      colorAccentHex: '#ff5500',
+      colorAccentHex: bank.color,
     });
     if (ok) {
+      setNewBankNickname('');
+      setNewBankBranch('');
+      setNewBankAccountNum('');
+      setNewBankInitialBalance('0');
       closeWizard();
     }
   };
@@ -374,6 +474,9 @@ export function DashboardPage({
       invoiceStatus: 'OPEN',
     });
     if (ok) {
+      setPixTransferAmount('');
+      setPixKeyValue('');
+      setPixRecipientName('');
       closeWizard();
     }
   };
@@ -416,6 +519,9 @@ export function DashboardPage({
       Number(budgetCeilingInput),
     );
     if (ok) {
+      setPixTransferAmount('');
+      setPixKeyValue('');
+      setPixRecipientName('');
       closeWizard();
     }
   };
@@ -2292,6 +2398,16 @@ export function DashboardPage({
                   <RotateCcw className="h-3.5 w-3.5" />
                   <span>Restaurar Dados de Demonstração</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => void viewModel.resetAccountToZero()}
+                  className="inline-flex items-center gap-2 rounded-full border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-600 hover:text-white transition-colors"
+                  title="Remove todos os dados simulados e inicia sua conta zerada com R$ 0,00"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Zerar Minha Conta (Saldo R$ 0,00)</span>
+                </button>
               </div>
             </section>
           </div>
@@ -2367,35 +2483,45 @@ export function DashboardPage({
       )}
 
       {/* =====================================================================
-          MODAL WIZARD PASSO A PASSO ESTILO NUBANK (TODOS OS MÓDULOS)
+          FLUXO GUIADO PASSO A PASSO EM TELA CHEIA (SEM MODAL / ESPAÇOSO)
          ===================================================================== */}
       {activeWizard && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4">
-          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl nexo-card p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            {/* Cabeçalho do Wizard */}
-            <div className="flex items-center justify-between mb-6">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[var(--background-page)] p-4 sm:p-8 flex justify-center items-start animate-in fade-in">
+          <div className="w-full max-w-2xl rounded-3xl nexo-card p-6 sm:p-10 shadow-2xl my-auto space-y-6">
+            {/* Cabeçalho do Wizard em Tela Ampla */}
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4 mb-6">
               {wizardStep > 1 ? (
                 <button
                   type="button"
                   onClick={() => setWizardStep((s) => s - 1)}
-                  className="inline-flex items-center gap-1 text-xs nexo-text-secondary hover:text-[#ff5500]"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium nexo-text-secondary hover:text-[#ff5500] transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  <span>Voltar</span>
+                  <span>Voltar para o Passo {wizardStep - 1}</span>
                 </button>
               ) : (
-                <span className="text-xs font-medium text-[#ff5500] uppercase tracking-wider">
-                  Fluxo Guiado Passo a Passo
-                </span>
+                <button
+                  type="button"
+                  onClick={closeWizard}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium nexo-text-secondary hover:text-[#ff5500] transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Voltar para o Portal</span>
+                </button>
               )}
 
-              <button
-                type="button"
-                onClick={closeWizard}
-                className="flex h-8 w-8 items-center justify-center rounded-full nexo-elevated nexo-text-secondary hover:text-[#ff5500]"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="text-xs uppercase tracking-wider text-[#ff5500] font-semibold">
+                  {getWizardTitle(activeWizard)}
+                </span>
+                <button
+                  type="button"
+                  onClick={closeWizard}
+                  className="rounded-full nexo-elevated px-3 py-1.5 text-xs nexo-text-muted hover:text-[#ff5500] transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
 
             {/* WIZARD 1: TRANSFERIR PIX (3 PASSOS) */}
@@ -2405,7 +2531,7 @@ export function DashboardPage({
                   {[1, 2, 3].map((s) => (
                     <span
                       key={s}
-                      className={`h-1 flex-1 rounded-full ${
+                      className={`h-1.5 flex-1 rounded-full ${
                         wizardStep >= s
                           ? 'bg-[#ff5500]'
                           : 'bg-[var(--border-subtle)]'
@@ -2415,148 +2541,206 @@ export function DashboardPage({
                 </div>
 
                 {wizardStep === 1 && (
-                  <div className="space-y-5">
-                    <div>
-                      <h3 className="font-heading text-xl mb-1">
-                        Qual é o valor da transferência?
+                  <div className="space-y-6">
+                    <div className="text-center space-y-1">
+                      <h3 className="font-heading text-2xl">
+                        Quanto você quer transferir?
                       </h3>
                       <p className="text-xs nexo-text-secondary">
-                        Saldo disponível na conta Asaas:{' '}
-                        {formatCurrency(
-                          state.accounts.find(
-                            (a) => a.institution === InstitutionCode.ASAAS,
-                          )?.balance ?? 0,
-                        )}
+                        Saldo disponível na Nexo Conta Digital (Asaas BaaS):{' '}
+                        <strong className="text-foreground">
+                          {formatCurrency(
+                            state.accounts.find(
+                              (a) => a.institution === InstitutionCode.ASAAS,
+                            )?.balance ?? 0,
+                          )}
+                        </strong>
                       </p>
                     </div>
 
-                    <div>
-                      <label className="block text-xs nexo-text-muted mb-2">
-                        Valor em R$
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        step="0.01"
-                        autoFocus
-                        value={pixTransferAmount}
-                        onChange={(e) => setPixTransferAmount(e.target.value)}
-                        className="w-full rounded-2xl nexo-elevated px-4 py-4 font-heading text-2xl focus:outline-none focus:border-[#ff5500]"
-                      />
-                    </div>
+                    <CurrencyInput
+                      value={Number(pixTransferAmount) || 0}
+                      onChange={(v) =>
+                        setPixTransferAmount(v > 0 ? v.toString() : '')
+                      }
+                      label="Valor da transferência"
+                      helperText="O valor sairá da sua conta e será enviado em tempo real via Asaas PIX."
+                      autoFocus
+                    />
 
                     <button
                       type="button"
+                      disabled={
+                        !Number(pixTransferAmount) ||
+                        Number(pixTransferAmount) <= 0
+                      }
                       onClick={() => setWizardStep(2)}
-                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                      className="w-full rounded-full bg-[#ff5500] py-4 text-sm font-medium text-white disabled:opacity-50"
                     >
-                      Continuar
+                      Continuar para Destinatário
                     </button>
                   </div>
                 )}
 
                 {wizardStep === 2 && (
-                  <div className="space-y-5">
-                    <div>
-                      <h3 className="font-heading text-xl mb-1">
+                  <div className="space-y-6">
+                    <div className="space-y-1">
+                      <h3 className="font-heading text-2xl">
                         Para quem você quer enviar{' '}
                         {formatCurrency(Number(pixTransferAmount) || 0)}?
                       </h3>
                       <p className="text-xs nexo-text-secondary">
-                        Selecione o tipo de chave e informe os dados do
-                        destinatário.
+                        Informe a chave PIX e os dados do favorecido.
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-1.5">
+                    <div className="grid grid-cols-4 gap-2">
                       {(['CPF', 'EMAIL', 'PHONE', 'RANDOM'] as const).map(
                         (t) => (
                           <button
                             key={t}
                             type="button"
                             onClick={() => setPixKeyType(t)}
-                            className={`rounded-xl py-2 text-xs font-medium ${
+                            className={`rounded-2xl py-3 text-xs font-medium transition-colors ${
                               pixKeyType === t
                                 ? 'bg-[#ff5500] text-white'
-                                : 'nexo-elevated nexo-text-secondary'
+                                : 'nexo-elevated nexo-text-secondary hover:border-[#ff5500]/50'
                             }`}
                           >
-                            {t}
+                            {t === 'RANDOM' ? 'Aleatória' : t}
                           </button>
                         ),
                       )}
                     </div>
 
-                    <div>
-                      <label className="block text-xs nexo-text-muted mb-1.5">
-                        Chave PIX ({pixKeyType})
-                      </label>
-                      <input
-                        type="text"
-                        value={pixKeyValue}
-                        onChange={(e) => setPixKeyValue(e.target.value)}
-                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm focus:outline-none focus:border-[#ff5500]"
-                      />
-                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs nexo-text-muted mb-1.5">
+                          Chave PIX ({pixKeyType})
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={
+                            pixKeyType === 'CPF'
+                              ? '000.000.000-00'
+                              : pixKeyType === 'EMAIL'
+                              ? 'chave@email.com'
+                              : pixKeyType === 'PHONE'
+                              ? '(11) 99999-9999'
+                              : 'Chave aleatória UUID'
+                          }
+                          value={pixKeyValue}
+                          onChange={(e) => setPixKeyValue(e.target.value)}
+                          className="w-full rounded-2xl nexo-elevated px-4 py-3.5 text-sm focus:outline-none focus:border-[#ff5500]"
+                        />
+                      </div>
 
-                    <div>
-                      <label className="block text-xs nexo-text-muted mb-1.5">
-                        Nome do favorecido
-                      </label>
-                      <input
-                        type="text"
-                        value={pixRecipientName}
-                        onChange={(e) => setPixRecipientName(e.target.value)}
-                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm focus:outline-none focus:border-[#ff5500]"
-                      />
+                      <div>
+                        <label className="block text-xs nexo-text-muted mb-1.5">
+                          Nome Completo do Favorecido
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex.: Guilherme Queiroz Ribeiro"
+                          value={pixRecipientName}
+                          onChange={(e) => setPixRecipientName(e.target.value)}
+                          className="w-full rounded-2xl nexo-elevated px-4 py-3.5 text-sm focus:outline-none focus:border-[#ff5500]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs nexo-text-muted mb-1.5">
+                          Banco do Favorecido
+                        </label>
+                        <select
+                          value={pixRecipientBank}
+                          onChange={(e) => setPixRecipientBank(e.target.value)}
+                          className="w-full rounded-2xl nexo-elevated px-4 py-3.5 text-sm focus:outline-none focus:border-[#ff5500]"
+                        >
+                          {BRAZILIAN_BANKS.map((b) => (
+                            <option key={b.code} value={b.shortName}>
+                              {b.code} - {b.shortName} ({b.name})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
                     <button
                       type="button"
+                      disabled={
+                        pixKeyValue.trim().length < 3 ||
+                        pixRecipientName.trim().length < 2
+                      }
                       onClick={() => setWizardStep(3)}
-                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                      className="w-full rounded-full bg-[#ff5500] py-4 text-sm font-medium text-white disabled:opacity-50"
                     >
-                      Revisar transferência
+                      Revisar Transferência
                     </button>
                   </div>
                 )}
 
                 {wizardStep === 3 && (
-                  <div className="space-y-5">
-                    <div>
-                      <h3 className="font-heading text-xl mb-1">
-                        Confirme os dados
+                  <div className="space-y-6">
+                    <div className="space-y-1">
+                      <h3 className="font-heading text-2xl">
+                        Confirmar Transferência PIX
                       </h3>
                       <p className="text-xs nexo-text-secondary">
-                        Verifique as informações antes de enviar o PIX.
+                        Revise os dados com atenção antes de autorizar o envio.
                       </p>
                     </div>
 
-                    <div className="rounded-2xl nexo-elevated p-4 space-y-3 text-xs">
-                      <div className="flex justify-between">
-                        <span className="nexo-text-muted">Valor</span>
-                        <span className="font-heading text-sm text-[#ff5500]">
+                    <div className="rounded-3xl nexo-elevated p-6 space-y-4 border border-[var(--border-subtle)]">
+                      <div className="text-center py-2 border-b border-[var(--border-subtle)]">
+                        <span className="text-xs text-muted block mb-1">
+                          Valor do PIX
+                        </span>
+                        <span className="text-4xl font-heading font-bold text-[#ff5500]">
                           {formatCurrency(Number(pixTransferAmount) || 0)}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="nexo-text-muted">Para</span>
-                        <span className="font-medium">{pixRecipientName}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="nexo-text-muted">
-                          Chave ({pixKeyType})
-                        </span>
-                        <span className="font-mono">{pixKeyValue}</span>
+
+                      <div className="space-y-2.5 text-xs">
+                        <div className="flex justify-between py-1 border-b border-[var(--border-subtle)]">
+                          <span className="nexo-text-muted">Destinatário</span>
+                          <span className="font-medium text-foreground">
+                            {pixRecipientName}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-[var(--border-subtle)]">
+                          <span className="nexo-text-muted">
+                            Chave ({pixKeyType})
+                          </span>
+                          <span className="font-mono text-foreground">
+                            {pixKeyValue}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-[var(--border-subtle)]">
+                          <span className="nexo-text-muted">
+                            Instituição Financeira
+                          </span>
+                          <span className="font-medium text-foreground">
+                            {pixRecipientBank}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="nexo-text-muted">
+                            Tarifa de Transferência
+                          </span>
+                          <span className="font-medium text-emerald-500">
+                            Grátis (R$ 0,00)
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => void handleConfirmPixTransfer()}
-                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                      className="w-full rounded-full bg-[#ff5500] py-4 text-sm font-medium text-white shadow-lg"
                     >
-                      Confirmar e enviar PIX
+                      Autorizar e Enviar PIX
                     </button>
                   </div>
                 )}
@@ -2570,7 +2754,7 @@ export function DashboardPage({
                   {[1, 2].map((s) => (
                     <span
                       key={s}
-                      className={`h-1 flex-1 rounded-full ${
+                      className={`h-1.5 flex-1 rounded-full ${
                         wizardStep >= s
                           ? 'bg-[#ff5500]'
                           : 'bg-[var(--border-subtle)]'
@@ -2582,72 +2766,100 @@ export function DashboardPage({
                 {wizardStep === 1 ? (
                   <form
                     onSubmit={(e) => void handleGeneratePixQr(e)}
-                    className="space-y-5"
+                    className="space-y-6"
                   >
-                    <div>
-                      <h3 className="font-heading text-xl mb-1">
-                        Qual valor você quer receber?
+                    <div className="text-center space-y-1">
+                      <h3 className="font-heading text-2xl">
+                        Quanto você quer receber?
                       </h3>
                       <p className="text-xs nexo-text-secondary">
-                        Gere um QR Code PIX imediato pela conta Asaas.
+                        Gere uma cobrança imediata via Asaas PIX com QR Code
+                        escaneável por qualquer banco.
                       </p>
                     </div>
 
-                    <div>
-                      <label className="block text-xs nexo-text-muted mb-1.5">
-                        Valor da cobrança (R$)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        step="0.01"
-                        required
-                        value={pixChargeAmount}
-                        onChange={(e) => setPixChargeAmount(e.target.value)}
-                        className="w-full rounded-2xl nexo-elevated px-4 py-4 font-heading text-2xl focus:outline-none focus:border-[#ff5500]"
-                      />
-                    </div>
+                    <CurrencyInput
+                      value={Number(pixChargeAmount) || 0}
+                      onChange={(v) =>
+                        setPixChargeAmount(v > 0 ? v.toString() : '')
+                      }
+                      label="Valor a Receber via PIX"
+                      helperText="O valor pago cairá na sua conta e você poderá usá-lo para transferências."
+                      autoFocus
+                    />
 
                     <div>
                       <label className="block text-xs nexo-text-muted mb-1.5">
-                        Descrição
+                        Descrição ou Identificador da Cobrança
                       </label>
                       <input
                         type="text"
                         required
+                        placeholder="Ex.: Prestação de Serviços, Depósito em Conta..."
                         value={pixChargeDesc}
                         onChange={(e) => setPixChargeDesc(e.target.value)}
-                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm focus:outline-none focus:border-[#ff5500]"
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3.5 text-sm focus:outline-none focus:border-[#ff5500]"
                       />
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                      disabled={
+                        !Number(pixChargeAmount) || Number(pixChargeAmount) <= 0
+                      }
+                      className="w-full rounded-full bg-[#ff5500] py-4 text-sm font-medium text-white disabled:opacity-50"
                     >
                       Gerar QR Code PIX
                     </button>
                   </form>
                 ) : (
-                  <div className="space-y-5">
-                    <div>
-                      <h3 className="font-heading text-xl mb-1">
-                        Cobrança PIX pronta
+                  <div className="space-y-6 text-center">
+                    <div className="space-y-1">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 text-emerald-500 px-3 py-1 text-xs font-medium">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Aguardando Pagamento PIX
+                      </span>
+                      <h3 className="font-heading text-2xl mt-2">
+                        Escaneie o QR Code para pagar
                       </h3>
                       <p className="text-xs nexo-text-secondary">
-                        Compartilhe o código Copia e Cola abaixo.
+                        Valor a receber:{' '}
+                        <strong className="text-foreground text-sm">
+                          {formatCurrency(Number(pixChargeAmount) || 0)}
+                        </strong>
                       </p>
                     </div>
 
-                    {state.activePixCharge && (
-                      <div className="rounded-2xl nexo-elevated p-4 space-y-3">
-                        <div className="flex justify-between text-xs">
-                          <span className="nexo-text-muted">Valor</span>
-                          <span className="font-heading text-[#ff5500]">
-                            {formatCurrency(state.activePixCharge.amount)}
-                          </span>
+                    {/* QR Code Real em Alta Resolução */}
+                    {activeQrCodeImage && (
+                      <div className="space-y-3">
+                        <div className="inline-block p-4 bg-white rounded-3xl shadow-xl border border-zinc-200">
+                          <img
+                            src={activeQrCodeImage}
+                            alt="QR Code PIX Escaneável"
+                            className="w-60 h-60 sm:w-64 sm:h-64 rounded-xl mx-auto"
+                          />
                         </div>
-                        <p className="text-[11px] font-mono break-all nexo-text-secondary bg-black/20 p-3 rounded-xl">
+                        <div>
+                          <a
+                            href={activeQrCodeImage}
+                            download={`qrcode-pix-${pixChargeAmount || 'cobranca'}.png`}
+                            className="inline-flex items-center gap-1.5 text-xs text-[#ff5500] font-medium hover:underline"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            <span>Baixar Imagem do QR Code (PNG)</span>
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Código Copia e Cola */}
+                    {state.activePixCharge && (
+                      <div className="rounded-3xl nexo-elevated p-5 text-left space-y-3">
+                        <label className="block text-xs nexo-text-muted">
+                          Código PIX Copia e Cola
+                        </label>
+                        <p className="text-[11px] font-mono break-all nexo-text-secondary bg-black/10 dark:bg-black/40 p-3 rounded-2xl select-all">
                           {state.activePixCharge.qrPayload[0]}
                         </p>
                         <button
@@ -2657,22 +2869,38 @@ export function DashboardPage({
                               state.activePixCharge!.qrPayload[0],
                             )
                           }
-                          className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#ff5500] py-3 text-xs font-medium text-white"
+                          className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
                         >
                           {copiedQr ? (
                             <>
                               <Check className="h-4 w-4" />
-                              <span>Copiado!</span>
+                              <span>Código Copiado com Sucesso!</span>
                             </>
                           ) : (
                             <>
                               <Copy className="h-4 w-4" />
-                              <span>Copiar código PIX</span>
+                              <span>Copiar Código Copia e Cola</span>
                             </>
                           )}
                         </button>
                       </div>
                     )}
+
+                    <div className="rounded-2xl border border-[var(--border-subtle)] p-4 text-xs text-muted text-left">
+                      💡 <strong>Como pagar:</strong> Abra o aplicativo do seu
+                      banco (Santander, Nubank, Itaú, Bradesco, Inter, Caixa,
+                      etc.), escolha <strong>PIX → Ler QR Code</strong> e aponte
+                      a câmera para a imagem acima, ou utilize a opção{' '}
+                      <strong>PIX Copia e Cola</strong>.
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={closeWizard}
+                      className="rounded-full nexo-elevated px-6 py-2.5 text-xs font-medium hover:text-[#ff5500]"
+                    >
+                      Concluir e Voltar
+                    </button>
                   </div>
                 )}
               </div>
@@ -2742,21 +2970,12 @@ export function DashboardPage({
                     <h3 className="font-heading text-xl">
                       Valor e identificação
                     </h3>
-                    <div>
-                      <label className="block text-xs nexo-text-muted mb-1.5">
-                        Valor (R$)
-                      </label>
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        autoFocus
-                        value={txAmount}
-                        onChange={(e) => setTxAmount(e.target.value)}
-                        placeholder="0,00"
-                        className="w-full rounded-2xl nexo-elevated px-4 py-3.5 font-heading text-xl focus:outline-none focus:border-[#ff5500]"
-                      />
-                    </div>
+                    <CurrencyInput
+                      value={Number(txAmount) || 0}
+                      onChange={(v) => setTxAmount(v > 0 ? v.toString() : '')}
+                      label="Valor da Transação"
+                      autoFocus
+                    />
                     <div>
                       <label className="block text-xs nexo-text-muted mb-1.5">
                         Descrição
@@ -2836,14 +3055,14 @@ export function DashboardPage({
               </div>
             )}
 
-            {/* WIZARD 4: CONECTAR NOVO BANCO OPEN FINANCE (3 PASSOS) */}
+            {/* WIZARD 4: CONECTAR NOVO BANCO OPEN FINANCE COM TODOS OS BANCOS DO BRASIL */}
             {activeWizard === 'connect_bank' && (
-              <div className="space-y-5">
+              <div className="space-y-6">
                 <div className="flex gap-1.5">
                   {[1, 2, 3].map((s) => (
                     <span
                       key={s}
-                      className={`h-1 flex-1 rounded-full ${
+                      className={`h-1.5 flex-1 rounded-full ${
                         wizardStep >= s
                           ? 'bg-[#ff5500]'
                           : 'bg-[var(--border-subtle)]'
@@ -2853,121 +3072,221 @@ export function DashboardPage({
                 </div>
 
                 {wizardStep === 1 && (
-                  <div className="space-y-4">
-                    <h3 className="font-heading text-xl">
-                      Escolha a instituição Open Finance
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {Object.values(InstitutionCode).map((inst) => (
-                        <button
-                          key={inst}
-                          type="button"
-                          onClick={() => {
-                            setNewBankInst(inst);
-                            setNewBankNickname(
-                              `${getInstitutionDisplayName(inst)} Corporativo`,
-                            );
-                            setWizardStep(2);
-                          }}
-                          className="rounded-2xl nexo-elevated p-4 text-left hover:border-[#ff5500]"
-                        >
-                          <span className="font-heading text-xs block mb-1 text-[#ff5500]">
-                            {inst}
-                          </span>
-                          <span className="text-xs nexo-text-secondary">
-                            {getInstitutionDisplayName(inst)}
-                          </span>
-                        </button>
-                      ))}
+                  <div className="space-y-6">
+                    <div className="space-y-1">
+                      <h3 className="font-heading text-2xl">
+                        Conectar Instituição Bancária
+                      </h3>
+                      <p className="text-xs nexo-text-secondary">
+                        Selecione qualquer instituição financeira autorizada pelo Banco Central do Brasil.
+                      </p>
+                    </div>
+
+                    {/* Botão em destaque Pluggy Connect Oficial */}
+                    <div className="rounded-3xl border border-[#ff5500]/30 bg-[#ff5500]/5 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <span className="text-xs uppercase tracking-wider text-[#ff5500] font-semibold block mb-0.5">
+                          Open Finance Automático
+                        </span>
+                        <p className="font-heading text-base">Pluggy Connect Oficial</p>
+                        <p className="text-xs nexo-text-secondary">
+                          Conecte sua conta em 1 clique com credenciais oficiais do seu banco.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenPluggyConnect()}
+                        disabled={isGeneratingPluggyToken}
+                        className="inline-flex items-center gap-2 rounded-full bg-[#ff5500] px-5 py-3 text-xs font-medium text-white shadow-md disabled:opacity-50"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        <span>
+                          {isGeneratingPluggyToken
+                            ? 'Emitindo Token Pluggy...'
+                            : 'Abrir Pluggy Connect'}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Busca e Filtros de Bancos Brasileiros */}
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+                          <input
+                            type="text"
+                            placeholder="Buscar por nome ou código (ex.: Santander, 033, Caixa, Nubank...)"
+                            value={bankSearchQuery}
+                            onChange={(e) => setBankSearchQuery(e.target.value)}
+                            className="w-full rounded-2xl nexo-elevated pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-[#ff5500]"
+                          />
+                        </div>
+
+                        <div className="flex gap-1.5 self-start sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBankFilter('POPULAR')}
+                            className={`rounded-full px-3.5 py-2 text-xs font-medium transition-colors ${
+                              selectedBankFilter === 'POPULAR'
+                                ? 'bg-[#ff5500] text-white'
+                                : 'nexo-elevated nexo-text-secondary'
+                            }`}
+                          >
+                            Mais Populares
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBankFilter('ALL')}
+                            className={`rounded-full px-3.5 py-2 text-xs font-medium transition-colors ${
+                              selectedBankFilter === 'ALL'
+                                ? 'bg-[#ff5500] text-white'
+                                : 'nexo-elevated nexo-text-secondary'
+                            }`}
+                          >
+                            Todos ({BRAZILIAN_BANKS.length})
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto pr-1">
+                        {filteredBanks.map((bank) => (
+                          <button
+                            key={bank.code}
+                            type="button"
+                            onClick={() => {
+                              setSelectedBrazilianBank(bank);
+                              setNewBankNickname(`${bank.shortName} Conta Principal`);
+                              setNewBankCompe(bank.code);
+                              setWizardStep(2);
+                            }}
+                            className="rounded-2xl nexo-elevated p-4 text-left hover:border-[#ff5500] transition-all flex items-center gap-3 group"
+                          >
+                            <div
+                              className="h-10 w-10 rounded-xl flex items-center justify-center font-heading font-bold text-xs text-white shrink-0 shadow-sm"
+                              style={{ backgroundColor: bank.color }}
+                            >
+                              {bank.code}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="font-heading text-xs block truncate group-hover:text-[#ff5500] transition-colors">
+                                {bank.shortName}
+                              </span>
+                              <span className="text-[11px] nexo-text-secondary block truncate">
+                                {bank.name}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {wizardStep === 2 && (
-                  <div className="space-y-4">
-                    <h3 className="font-heading text-xl">
-                      Coordenadas da Conta (Tupla)
-                    </h3>
-                    <div>
-                      <label className="block text-xs nexo-text-muted mb-1">
-                        Apelido da Conta
-                      </label>
-                      <input
-                        type="text"
-                        value={newBankNickname}
-                        onChange={(e) => setNewBankNickname(e.target.value)}
-                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
-                      />
+                  <div className="space-y-6">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className="h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+                          style={{ backgroundColor: selectedBrazilianBank.color }}
+                        >
+                          {selectedBrazilianBank.code}
+                        </div>
+                        <span className="text-sm font-heading">{selectedBrazilianBank.name}</span>
+                      </div>
+                      <h3 className="font-heading text-2xl">
+                        Dados da Conta no {selectedBrazilianBank.shortName}
+                      </h3>
+                      <p className="text-xs nexo-text-secondary">
+                        Informe suas coordenadas bancárias para identificação e conciliação.
+                      </p>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+
+                    <div className="space-y-4">
                       <div>
-                        <label className="block text-xs nexo-text-muted mb-1">
-                          COMPE
+                        <label className="block text-xs nexo-text-muted mb-1.5">
+                          Apelido ou Nome da Conta
                         </label>
                         <input
                           type="text"
-                          value={newBankCompe}
-                          onChange={(e) => setNewBankCompe(e.target.value)}
-                          className="w-full rounded-2xl nexo-elevated px-3 py-2.5 text-xs font-mono"
+                          value={newBankNickname}
+                          onChange={(e) => setNewBankNickname(e.target.value)}
+                          className="w-full rounded-2xl nexo-elevated px-4 py-3.5 text-sm focus:outline-none focus:border-[#ff5500]"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs nexo-text-muted mb-1">
-                          Agência
-                        </label>
-                        <input
-                          type="text"
-                          value={newBankBranch}
-                          onChange={(e) => setNewBankBranch(e.target.value)}
-                          className="w-full rounded-2xl nexo-elevated px-3 py-2.5 text-xs font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs nexo-text-muted mb-1">
-                          Conta
-                        </label>
-                        <input
-                          type="text"
-                          value={newBankAccountNum}
-                          onChange={(e) => setNewBankAccountNum(e.target.value)}
-                          className="w-full rounded-2xl nexo-elevated px-3 py-2.5 text-xs font-mono"
-                        />
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs nexo-text-muted mb-1.5">
+                            Código COMPE
+                          </label>
+                          <input
+                            type="text"
+                            readOnly
+                            value={newBankCompe}
+                            className="w-full rounded-2xl nexo-elevated px-4 py-3 text-xs font-mono text-muted"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs nexo-text-muted mb-1.5">
+                            Agência (sem dígito)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex.: 0001"
+                            value={newBankBranch}
+                            onChange={(e) => setNewBankBranch(e.target.value)}
+                            className="w-full rounded-2xl nexo-elevated px-4 py-3 text-xs font-mono focus:outline-none focus:border-[#ff5500]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs nexo-text-muted mb-1.5">
+                            Número da Conta com Dígito
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex.: 12345-6"
+                            value={newBankAccountNum}
+                            onChange={(e) => setNewBankAccountNum(e.target.value)}
+                            className="w-full rounded-2xl nexo-elevated px-4 py-3 text-xs font-mono focus:outline-none focus:border-[#ff5500]"
+                          />
+                        </div>
                       </div>
                     </div>
+
                     <button
                       type="button"
                       onClick={() => setWizardStep(3)}
-                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                      className="w-full rounded-full bg-[#ff5500] py-4 text-sm font-medium text-white"
                     >
-                      Continuar
+                      Continuar para Saldo
                     </button>
                   </div>
                 )}
 
                 {wizardStep === 3 && (
-                  <div className="space-y-4">
-                    <h3 className="font-heading text-xl">
-                      Saldo Inicial e Consentimento
-                    </h3>
-                    <div>
-                      <label className="block text-xs nexo-text-muted mb-1">
-                        Saldo Inicial Sincronizado (R$)
-                      </label>
-                      <input
-                        type="number"
-                        value={newBankInitialBalance}
-                        onChange={(e) =>
-                          setNewBankInitialBalance(e.target.value)
-                        }
-                        className="w-full rounded-2xl nexo-elevated px-4 py-3.5 font-heading text-xl"
-                      />
+                  <div className="space-y-6">
+                    <div className="text-center space-y-1">
+                      <h3 className="font-heading text-2xl">Saldo Atual da Conta</h3>
+                      <p className="text-xs nexo-text-secondary">
+                        Digite o saldo inicial conciliado da sua conta (ou deixe R$ 0,00 se for iniciar agora).
+                      </p>
                     </div>
+
+                    <CurrencyInput
+                      value={Number(newBankInitialBalance) || 0}
+                      onChange={(v) => setNewBankInitialBalance(v > 0 ? v.toString() : '0')}
+                      label="Saldo Conciliado (R$)"
+                      helperText="O saldo será registrado na sua tabela de Contas e somado ao Saldo Global."
+                      autoFocus
+                    />
+
                     <button
                       type="button"
                       onClick={() => void handleConnectNewBank()}
-                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                      className="w-full rounded-full bg-[#ff5500] py-4 text-sm font-medium text-white shadow-lg"
                     >
-                      Autorizar Open Finance e Salvar Conta
+                      Concluir Conexão e Salvar Conta
                     </button>
                   </div>
                 )}

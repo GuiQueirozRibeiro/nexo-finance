@@ -28,6 +28,7 @@ export interface PixChargeEntity {
   readonly amount: number;
   readonly status: PixOperationStatus;
   readonly qrPayload: PixQrPayloadTuple;
+  readonly qrCodeDataUrl?: string;
   readonly provider: 'ASAAS_API' | 'SANDBOX_SIMULATOR';
   readonly createdAtIso: string;
 }

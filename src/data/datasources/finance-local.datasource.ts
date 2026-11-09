@@ -12,6 +12,8 @@
 import {
   CacheException,
   FirebaseClientManager,
+  InstitutionCode,
+  TransactionCategory,
   isPlainRecord,
   safeJsonParse,
 } from '@/core';
@@ -58,6 +60,7 @@ export interface IFinanceLocalDataSource {
   savePixKeys(keys: readonly RegisteredPixKey[]): void;
   syncFromFirestore(): Promise<boolean>;
   resetToSeed(): void;
+  resetToZero(): void;
 }
 
 export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
@@ -392,7 +395,8 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
     const cloudSnap =
       await FirebaseClientManager.loadUserSnapshotFromFirestore();
     if (!cloudSnap) {
-      this._pushAllToFirestore();
+      // Usuário novo autenticado! Inicia limpo com R$ 0,00 e salva na nuvem
+      this.resetToZero();
       return true;
     }
 
@@ -433,6 +437,73 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
       );
     }
     return true;
+  }
+
+  public resetToZero(): void {
+    const cleanAccount = new BankAccountModel({
+      id: 'acc-nexo-primary',
+      institution: InstitutionCode.ASAAS,
+      nickname: 'Nexo Conta Digital (Asaas)',
+      balance: 0,
+      coordinates: ['461', '0001', '1001-0'],
+      consentStatus: 'AUTHORIZED',
+      lastSyncIso: new Date().toISOString(),
+      colorAccentHex: '#ff5500',
+    });
+
+    FinanceLocalDataSourceImpl._memoryAccounts = [cleanAccount];
+    FinanceLocalDataSourceImpl._memoryTransactions = [];
+    FinanceLocalDataSourceImpl._memoryCards = [];
+    FinanceLocalDataSourceImpl._memoryCosts = [
+      new CostCenterBudget({
+        id: 'cost-housing',
+        category: TransactionCategory.HOUSING,
+        costCenterName: 'Moradia e Infraestrutura Fixa',
+        responsibleArea: 'Operações / Fixo',
+        thresholds: [2000, 2500],
+      }),
+      new CostCenterBudget({
+        id: 'cost-food',
+        category: TransactionCategory.FOOD,
+        costCenterName: 'Alimentação',
+        responsibleArea: 'Cotidiano',
+        thresholds: [1000, 1500],
+      }),
+      new CostCenterBudget({
+        id: 'cost-transport',
+        category: TransactionCategory.TRANSPORT,
+        costCenterName: 'Mobilidade e Transporte',
+        responsibleArea: 'Logística',
+        thresholds: [400, 600],
+      }),
+      new CostCenterBudget({
+        id: 'cost-subs',
+        category: TransactionCategory.SUBSCRIPTIONS,
+        costCenterName: 'Tecnologia e Assinaturas',
+        responsibleArea: 'Tecnologia',
+        thresholds: [300, 500],
+      }),
+    ];
+    FinanceLocalDataSourceImpl._memorySubs = [];
+    FinanceLocalDataSourceImpl._memoryPixKeys = [];
+
+    if (this._hasBrowserStorage()) {
+      window.localStorage.setItem(
+        ACCOUNTS_STORAGE_KEY,
+        JSON.stringify([cleanAccount.toJson()]),
+      );
+      window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify([]));
+      window.localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify([]));
+      window.localStorage.setItem(
+        COSTS_STORAGE_KEY,
+        JSON.stringify(
+          FinanceLocalDataSourceImpl._memoryCosts.map((c) => c.toProps()),
+        ),
+      );
+      window.localStorage.setItem(SUBS_STORAGE_KEY, JSON.stringify([]));
+      window.localStorage.setItem(PIXKEYS_STORAGE_KEY, JSON.stringify([]));
+      this._pushAllToFirestore();
+    }
   }
 
   public resetToSeed(): void {
