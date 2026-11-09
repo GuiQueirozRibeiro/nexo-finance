@@ -17,9 +17,14 @@ import {
   FlavorConfig,
   type InstitutionCode,
   NoParams,
+  TransactionCategory,
 } from '@/core';
 import {
   FinanceLocalDataSourceImpl,
+  INITIAL_COST_CENTERS,
+  INITIAL_CREDIT_CARDS,
+  INITIAL_PIX_KEYS,
+  INITIAL_SUBSCRIPTIONS,
   OpenFinanceRepositoryImpl,
   PixGatewayDataSourceImpl,
   PixGatewayRepositoryImpl,
@@ -27,8 +32,10 @@ import {
 } from '@/data';
 import {
   type BankAccount,
+  CostCenterBudget,
   CreatePixChargeUseCase,
   CreateTransactionUseCase,
+  CreditCardAccount,
   type DashboardSummary,
   ExecutePixTransferUseCase,
   GetDashboardSnapshotUseCase,
@@ -36,6 +43,9 @@ import {
   type PixChargeEntity,
   type PixTransferReceipt,
   type PixTransferRequest,
+  RecurringSubscription,
+  RegisteredPixKey,
+  type RegisteredPixKeyProps,
   SearchTransactionsUseCase,
   SyncOpenFinanceInstitutionUseCase,
   ToggleOpenFinanceConsentUseCase,
@@ -59,6 +69,10 @@ export interface FinanceViewState {
   readonly accounts: readonly BankAccount[];
   readonly transactions: readonly Transaction[];
   readonly filteredTransactions: readonly Transaction[];
+  readonly creditCards: readonly CreditCardAccount[];
+  readonly costCenters: readonly CostCenterBudget[];
+  readonly subscriptions: readonly RecurringSubscription[];
+  readonly pixKeys: readonly RegisteredPixKey[];
   readonly summary: DashboardSummary | null;
   readonly activePixCharge: PixChargeEntity | null;
   readonly lastPixReceipt: PixTransferReceipt | null;
@@ -91,6 +105,12 @@ export class FinanceViewModel {
       accounts: [],
       transactions: [],
       filteredTransactions: [],
+      creditCards: INITIAL_CREDIT_CARDS.map((p) => new CreditCardAccount(p)),
+      costCenters: INITIAL_COST_CENTERS.map((p) => new CostCenterBudget(p)),
+      subscriptions: INITIAL_SUBSCRIPTIONS.map(
+        (p) => new RecurringSubscription(p),
+      ),
+      pixKeys: INITIAL_PIX_KEYS.map((p) => new RegisteredPixKey(p)),
       summary: null,
       activePixCharge: null,
       lastPixReceipt: null,
@@ -304,10 +324,126 @@ export class FinanceViewModel {
     }
     await this.loadDashboard();
     this._emit({
+      creditCards: INITIAL_CREDIT_CARDS.map((p) => new CreditCardAccount(p)),
+      costCenters: INITIAL_COST_CENTERS.map((p) => new CostCenterBudget(p)),
+      subscriptions: INITIAL_SUBSCRIPTIONS.map(
+        (p) => new RecurringSubscription(p),
+      ),
+      pixKeys: INITIAL_PIX_KEYS.map((p) => new RegisteredPixKey(p)),
       activePixCharge: null,
       lastPixReceipt: null,
       feedbackBanner: 'Dados restaurados para o cenário padrão da demonstração.',
     });
+  }
+
+  public async payCardInvoice(cardId: string): Promise<boolean> {
+    const target = this._state.creditCards.find((c) => c.id === cardId);
+    if (!target) {
+      return false;
+    }
+    const updatedCard = new CreditCardAccount(target.toProps());
+    const outcome = updatedCard.payInvoice();
+    if (outcome.isLeft()) {
+      this._emit({ errorMessage: outcome.value.toSummary() });
+      return false;
+    }
+
+    await this.addNewTransaction({
+      id: `tx-invoice-${Date.now()}`,
+      title: `Pagamento Fatura • ${target.cardName}`,
+      amount: outcome.value,
+      type: 'EXPENSE',
+      category: TransactionCategory.PIX,
+      institution: target.institution,
+      dateIso: new Date().toISOString().slice(0, 10),
+    });
+
+    this._emit({
+      creditCards: this._state.creditCards.map((c) =>
+        c.id === cardId ? updatedCard : c,
+      ),
+      feedbackBanner: `Fatura do cartão ${target.cardName} (R$ ${outcome.value.toFixed(2)}) paga com sucesso.`,
+    });
+    return true;
+  }
+
+  public adjustCardLimit(cardId: string, newTotalLimit: number): boolean {
+    const target = this._state.creditCards.find((c) => c.id === cardId);
+    if (!target) {
+      return false;
+    }
+    const updatedCard = new CreditCardAccount(target.toProps());
+    const outcome = updatedCard.adjustLimit(newTotalLimit);
+    if (outcome.isLeft()) {
+      this._emit({ errorMessage: outcome.value.toSummary() });
+      return false;
+    }
+    this._emit({
+      errorMessage: null,
+      creditCards: this._state.creditCards.map((c) =>
+        c.id === cardId ? updatedCard : c,
+      ),
+      feedbackBanner: `Limite do cartão ${target.cardName} ajustado para R$ ${newTotalLimit.toFixed(2)}.`,
+    });
+    return true;
+  }
+
+  public updateCostCenterThresholds(
+    budgetId: string,
+    newIdeal: number,
+    newCeiling: number,
+  ): boolean {
+    const target = this._state.costCenters.find((b) => b.id === budgetId);
+    if (!target) {
+      return false;
+    }
+    const updated = new CostCenterBudget(target.toProps());
+    const outcome = updated.updateThresholds(newIdeal, newCeiling);
+    if (outcome.isLeft()) {
+      this._emit({ errorMessage: outcome.value.toSummary() });
+      return false;
+    }
+    this._emit({
+      errorMessage: null,
+      costCenters: this._state.costCenters.map((b) =>
+        b.id === budgetId ? updated : b,
+      ),
+      feedbackBanner: `Meta do centro de custo "${target.costCenterName}" atualizada para [Ideal: R$ ${newIdeal.toFixed(2)}, Teto: R$ ${newCeiling.toFixed(2)}].`,
+    });
+    return true;
+  }
+
+  public toggleSubscriptionStatus(subId: string): void {
+    const target = this._state.subscriptions.find((s) => s.id === subId);
+    if (!target) {
+      return;
+    }
+    const updated = new RecurringSubscription(target.toProps());
+    if (updated.status === 'DUPLICATE_ALERT') {
+      updated.resolveDuplicate();
+    } else {
+      updated.togglePause();
+    }
+    this._emit({
+      subscriptions: this._state.subscriptions.map((s) =>
+        s.id === subId ? updated : s,
+      ),
+      feedbackBanner: `Status da assinatura "${target.serviceName}" atualizado para ${updated.status}.`,
+    });
+  }
+
+  public registerPixKey(props: RegisteredPixKeyProps): boolean {
+    const validated = RegisteredPixKey.createValidated(props);
+    if (validated.isLeft()) {
+      this._emit({ errorMessage: validated.value.toSummary() });
+      return false;
+    }
+    this._emit({
+      errorMessage: null,
+      pixKeys: [validated.value, ...this._state.pixKeys],
+      feedbackBanner: `Chave PIX (${validated.value.keyType}) registrada com sucesso.`,
+    });
+    return true;
   }
 }
 

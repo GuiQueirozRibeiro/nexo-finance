@@ -3,7 +3,14 @@
  */
 
 import { InstitutionCode, TransactionCategory } from '@/core';
-import type { BankAccountProps, TransactionProps } from '@/domain';
+import type {
+  BankAccountProps,
+  CostCenterBudgetProps,
+  CreditCardAccountProps,
+  RecurringSubscriptionProps,
+  RegisteredPixKeyProps,
+  TransactionProps,
+} from '@/domain';
 
 export const INITIAL_BANK_ACCOUNTS: readonly BankAccountProps[] = [
   {
@@ -156,5 +163,162 @@ export const INITIAL_TRANSACTIONS: readonly TransactionProps[] = [
     dateIso: '2026-11-09',
     isRecurring: true,
     tags: ['reserva', 'cdb'],
+  },
+] as const;
+
+export const INITIAL_CREDIT_CARDS: readonly CreditCardAccountProps[] = [
+  {
+    id: 'card-nubank-uv',
+    institution: InstitutionCode.NUBANK,
+    cardName: 'Nubank Ultravioleta Black',
+    lastFourDigits: '4829',
+    brand: 'MASTERCARD_BLACK',
+    limits: [3420.5, 25000.0],
+    closingDay: 18,
+    dueDay: 25,
+    invoiceStatus: 'OPEN',
+  },
+  {
+    id: 'card-itau-pers',
+    institution: InstitutionCode.ITAU,
+    cardName: 'Itaú Personnalité Infinite',
+    lastFourDigits: '9014',
+    brand: 'VISA_INFINITE',
+    limits: [4180.0, 40000.0],
+    closingDay: 10,
+    dueDay: 17,
+    invoiceStatus: 'CLOSED',
+  },
+  {
+    id: 'card-inter-black',
+    institution: InstitutionCode.INTER,
+    cardName: 'Inter Prime Black',
+    lastFourDigits: '3310',
+    brand: 'MASTERCARD_BLACK',
+    limits: [890.0, 18000.0],
+    closingDay: 5,
+    dueDay: 12,
+    invoiceStatus: 'OPEN',
+  },
+] as const;
+
+export const INITIAL_COST_CENTERS: readonly CostCenterBudgetProps[] = [
+  {
+    id: 'cc-housing',
+    category: TransactionCategory.HOUSING,
+    costCenterName: 'Moradia & Infraestrutura Fixa',
+    responsibleArea: 'Operações / Fixo',
+    thresholds: [2500, 3000],
+  },
+  {
+    id: 'cc-food',
+    category: TransactionCategory.FOOD,
+    costCenterName: 'Alimentação & Representação',
+    responsibleArea: 'Cotidiano',
+    thresholds: [1100, 1500],
+  },
+  {
+    id: 'cc-subs',
+    category: TransactionCategory.SUBSCRIPTIONS,
+    costCenterName: 'Cloud, IA & Assinaturas SaaS',
+    responsibleArea: 'Tecnologia Exímia',
+    thresholds: [400, 600],
+  },
+  {
+    id: 'cc-transport',
+    category: TransactionCategory.TRANSPORT,
+    costCenterName: 'Mobilidade & Deslocamentos',
+    responsibleArea: 'Logística',
+    thresholds: [500, 800],
+  },
+  {
+    id: 'cc-investments',
+    category: TransactionCategory.INVESTMENTS,
+    costCenterName: 'Aportes & Reserva de Liquidez',
+    responsibleArea: 'Patrimônio',
+    thresholds: [1500, 3000],
+  },
+] as const;
+
+export const INITIAL_SUBSCRIPTIONS: readonly RecurringSubscriptionProps[] = [
+  {
+    id: 'sub-vercel',
+    serviceName: 'Vercel Pro & Cloud Infra',
+    category: TransactionCategory.SUBSCRIPTIONS,
+    institution: InstitutionCode.ASAAS,
+    monthlyAmount: 215.0,
+    billingDay: 8,
+    status: 'ACTIVE',
+  },
+  {
+    id: 'sub-ai',
+    serviceName: 'OpenAI & Anthropic Pro',
+    category: TransactionCategory.SUBSCRIPTIONS,
+    institution: InstitutionCode.NUBANK,
+    monthlyAmount: 240.0,
+    billingDay: 8,
+    status: 'ACTIVE',
+  },
+  {
+    id: 'sub-spotify-1',
+    serviceName: 'Spotify Duo Mensal (Cartão Principal)',
+    category: TransactionCategory.SUBSCRIPTIONS,
+    institution: InstitutionCode.NUBANK,
+    monthlyAmount: 34.9,
+    billingDay: 8,
+    status: 'ACTIVE',
+  },
+  {
+    id: 'sub-spotify-2',
+    serviceName: 'Spotify Duo Mensal (Cobrança Duplicada)',
+    category: TransactionCategory.SUBSCRIPTIONS,
+    institution: InstitutionCode.ITAU,
+    monthlyAmount: 34.9,
+    billingDay: 8,
+    status: 'DUPLICATE_ALERT',
+  },
+  {
+    id: 'sub-fibra',
+    serviceName: 'Vivo Fibra Empresarial 1Gbps',
+    category: TransactionCategory.HOUSING,
+    institution: InstitutionCode.ITAU,
+    monthlyAmount: 199.9,
+    billingDay: 15,
+    status: 'ACTIVE',
+  },
+] as const;
+
+export const INITIAL_PIX_KEYS: readonly RegisteredPixKeyProps[] = [
+  {
+    id: 'pk-email',
+    label: 'E-mail Corporativo Exímia',
+    keyType: 'EMAIL',
+    keyValue: 'financeiro@eximiatech.com.br',
+    institution: InstitutionCode.ASAAS,
+    isPrimary: true,
+  },
+  {
+    id: 'pk-phone',
+    label: 'Celular Principal',
+    keyType: 'PHONE',
+    keyValue: '+5561996301711',
+    institution: InstitutionCode.NUBANK,
+    isPrimary: false,
+  },
+  {
+    id: 'pk-cpf',
+    label: 'CPF Titular',
+    keyType: 'CPF',
+    keyValue: '12345678901',
+    institution: InstitutionCode.ITAU,
+    isPrimary: false,
+  },
+  {
+    id: 'pk-evp',
+    label: 'Chave Aleatória EVP Asaas',
+    keyType: 'RANDOM',
+    keyValue: 'eximia-nexo-9841-4a9b-8c2d-0df0b2991234',
+    institution: InstitutionCode.ASAAS,
+    isPrimary: false,
   },
 ] as const;

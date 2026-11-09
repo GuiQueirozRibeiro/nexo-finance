@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { InstitutionCode, TransactionCategory } from '@/core';
 import {
   BankAccount,
+  CostCenterBudget,
+  CreditCardAccount,
   PierreFinancialEngine,
   PixKeyValidator,
+  RecurringSubscription,
+  RegisteredPixKey,
   Transaction,
   applyFinancialFeeRule,
   describePaymentMethod,
@@ -179,5 +183,59 @@ describe('Domain Layer — Entities OOP, Tuplas e Regras de Negócio', () => {
     // Tipo de função (Function Type Alias)
     const netAfterAsaasFee = applyFinancialFeeRule(1000, (val) => val * 0.9901);
     expect(netAfterAsaasFee).toBe(990.1);
+  });
+
+  it('deve validar as entidades corporativas multi-tabelas (CreditCardAccount, CostCenterBudget, RecurringSubscription e RegisteredPixKey)', () => {
+    const card = new CreditCardAccount({
+      id: 'card-1',
+      institution: InstitutionCode.NUBANK,
+      cardName: 'Nubank Ultravioleta Black',
+      lastFourDigits: '4829',
+      brand: 'MASTERCARD_BLACK',
+      limits: [2500, 10000],
+      closingDay: 18,
+      dueDay: 25,
+      invoiceStatus: 'OPEN',
+    });
+
+    expect(card.usagePercentage).toBe(25);
+    expect(card.availableLimit).toBe(7500);
+    expect(card.payInvoice().isRight()).toBe(true);
+    expect(card.usedAmount).toBe(0);
+    expect(card.invoiceStatus).toBe('PAID');
+
+    const budget = new CostCenterBudget({
+      id: 'cc-1',
+      category: TransactionCategory.SUBSCRIPTIONS,
+      costCenterName: 'Cloud & IA',
+      responsibleArea: 'Engenharia',
+      thresholds: [400, 600],
+    });
+    expect(budget.evaluateSpend(450).status).toBe('NEAR_LIMIT');
+    expect(budget.updateThresholds(500, 800).isRight()).toBe(true);
+
+    const sub = new RecurringSubscription({
+      id: 'sub-1',
+      serviceName: 'Spotify Duplicado',
+      category: TransactionCategory.SUBSCRIPTIONS,
+      institution: InstitutionCode.ITAU,
+      monthlyAmount: 34.9,
+      billingDay: 8,
+      status: 'DUPLICATE_ALERT',
+    });
+    expect(sub.annualProjection).toBe(418.8);
+    sub.resolveDuplicate();
+    expect(sub.status).toBe('PAUSED');
+    expect(sub.annualProjection).toBe(0);
+
+    const pixKeyEither = RegisteredPixKey.createValidated({
+      id: 'pk-1',
+      label: 'E-mail Comercial',
+      keyType: 'EMAIL',
+      keyValue: 'Contato@EximiaTech.com.br',
+      institution: InstitutionCode.ASAAS,
+      isPrimary: true,
+    });
+    expect(pixKeyEither.isRight()).toBe(true);
   });
 });
