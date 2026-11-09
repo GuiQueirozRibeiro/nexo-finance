@@ -47,7 +47,12 @@ import {
   getCategoryLabel,
   getInstitutionDisplayName,
 } from '@/core';
-import type { CardBrand, PixKeyType, TransactionType } from '@/domain';
+import type {
+  CardBrand,
+  PixKeyType,
+  TransactionType,
+  WebhookAuditRecord,
+} from '@/domain';
 import {
   type FinanceViewState,
   createFinanceViewModel,
@@ -228,6 +233,18 @@ export function DashboardPage({
     null,
   );
   const [isGeneratingPluggyToken, setIsGeneratingPluggyToken] = useState(false);
+
+  // Estado Webhooks em Produção (Asaas PIX & Pluggy Open Finance)
+  const [webhookAuditLogs, setWebhookAuditLogs] = useState<
+    readonly WebhookAuditRecord[]
+  >([]);
+  const [lastWebhookPaymentId, setLastWebhookPaymentId] = useState<string>(
+    'pay_asaas_live_001',
+  );
+  const [webhookStatusFeedback, setWebhookStatusFeedback] = useState<
+    string | null
+  >(null);
+  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState<string | null>(null);
 
   // Estado Assistente & Busca
   const [chatInput, setChatInput] = useState('');
@@ -714,6 +731,120 @@ NEWFILEVERSION:100
       );
     } else {
       setProfileStatusMsg(result.value.toSummary());
+    }
+  };
+
+  const handleCopyWebhookEndpoint = async (path: string) => {
+    const origin =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : 'https://nexo.eximiatech.com.br';
+    const fullUrl = `${origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(fullUrl);
+      setCopiedWebhookUrl(path);
+      setTimeout(() => setCopiedWebhookUrl(null), 2500);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const handleTriggerAsaasWebhookTest = async (replayDuplicate: boolean) => {
+    const stamp = new Date().toISOString().replace(/\D/g, '').slice(-8);
+    const paymentId = replayDuplicate
+      ? lastWebhookPaymentId
+      : `pay_asaas_${stamp}`;
+    if (!replayDuplicate) {
+      setLastWebhookPaymentId(paymentId);
+    }
+
+    try {
+      const res = await fetch('/api/webhooks/asaas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-nexo-webhook-simulation': 'true',
+        },
+        body: JSON.stringify({
+          event: replayDuplicate ? 'PAYMENT_CONFIRMED' : 'PAYMENT_RECEIVED',
+          payment: {
+            id: paymentId,
+            value: 250.0,
+            description: `Recebimento PIX Instantâneo Asaas (${paymentId})`,
+          },
+        }),
+      });
+
+      const data = (await res.json()) as {
+        readonly received?: boolean;
+        readonly audit?: WebhookAuditRecord;
+        readonly error?: string;
+      };
+
+      if (data.audit) {
+        setWebhookAuditLogs((prev) => [data.audit!, ...prev.slice(0, 9)]);
+        if (data.audit.outcome === 'SETTLED_CREDIT') {
+          await viewModel.addNewTransaction({
+            id: `tx-wh-${paymentId}`,
+            title: `PIX Recebido via Webhook Asaas (${paymentId})`,
+            amount: 250.0,
+            type: 'INCOME',
+            category: TransactionCategory.PIX,
+            institution: InstitutionCode.ASAAS,
+            dateIso: new Date().toISOString().slice(0, 10),
+          });
+          setWebhookStatusFeedback(
+            `Webhook Asaas liquidado: +R$ 250,00 creditado no extrato e sincronizado no Firestore (${paymentId}).`,
+          );
+        } else if (data.audit.outcome === 'ALREADY_PROCESSED') {
+          setWebhookStatusFeedback(
+            `Trava de Idempotência ativada: o pagamento ${paymentId} já foi liquidado e NÃO duplicou saldo.`,
+          );
+        }
+      }
+    } catch {
+      setWebhookStatusFeedback(
+        'Não foi possível contatar o endpoint /api/webhooks/asaas.',
+      );
+    }
+  };
+
+  const handleTriggerPluggyWebhookTest = async () => {
+    const stamp = new Date().toISOString().replace(/\D/g, '').slice(-6);
+    const itemId = `item_pluggy_santander_${stamp}`;
+    try {
+      const res = await fetch('/api/webhooks/pluggy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-nexo-webhook-simulation': 'true',
+        },
+        body: JSON.stringify({
+          event: 'item/updated',
+          itemId,
+          eventId: `evt_${stamp}`,
+          balance: 14850.0,
+        }),
+      });
+
+      const data = (await res.json()) as {
+        readonly received?: boolean;
+        readonly audit?: WebhookAuditRecord;
+      };
+
+      if (data.audit) {
+        setWebhookAuditLogs((prev) => [data.audit!, ...prev.slice(0, 9)]);
+        if (selectedBank) {
+          await viewModel.syncInstitution(selectedBank.institution);
+        }
+        setWebhookStatusFeedback(
+          `Webhook Pluggy Open Finance processado: sincronização noturna de saldo executada (${itemId}).`,
+        );
+      }
+    } catch {
+      setWebhookStatusFeedback(
+        'Não foi possível contatar o endpoint /api/webhooks/pluggy.',
+      );
     }
   };
 
@@ -2521,6 +2652,193 @@ NEWFILEVERSION:100
                   <span>Portabilidade de Dados LGPD (JSON)</span>
                 </button>
               </div>
+            </section>
+
+            {/* WEBHOOKS EM PRODUÇÃO (ASAAS PIX E PLUGGY OPEN FINANCE) + BFF MOBILE */}
+            <section className="rounded-3xl nexo-card p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs uppercase tracking-wider text-[#ff5500] font-medium block mb-1">
+                    Eventos Push em Tempo Real e BFF Multiplataforma
+                  </span>
+                  <h3 className="font-heading text-lg">
+                    Webhooks em Produção (Asaas PIX e Pluggy Open Finance)
+                  </h3>
+                  <p className="text-xs nexo-text-secondary mt-1">
+                    Endpoints ativos com trava de idempotência e conferência cruzada (Double-Check) para liquidação instantânea de PIX e atualização de saldo noturna.
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-[#ff5500]/10 text-[#ff5500] px-3.5 py-1.5 text-xs font-medium">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>3 Travas de Segurança Ativas</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                {/* Webhook Asaas */}
+                <div className="rounded-2xl nexo-elevated p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading text-xs">
+                      Webhook Asaas PIX
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleCopyWebhookEndpoint('/api/webhooks/asaas')
+                      }
+                      className="inline-flex items-center gap-1 rounded-full nexo-card px-2.5 py-1 text-[11px] hover:text-[#ff5500] transition-colors"
+                    >
+                      {copiedWebhookUrl === '/api/webhooks/asaas' ? (
+                        <>
+                          <Check className="h-3 w-3 text-[#ff5500]" />
+                          <span>Copiado</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          <span>Copiar URL</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="font-mono text-[11px] nexo-text-secondary break-all">
+                    https://nexo.eximiatech.com.br/api/webhooks/asaas
+                  </p>
+                  <p className="nexo-text-muted text-[11px]">
+                    Eventos: <code>PAYMENT_RECEIVED</code>,{' '}
+                    <code>PAYMENT_CONFIRMED</code> e <code>TRANSFER_DONE</code>.
+                    Header: <code>asaas-access-token</code>.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => void handleTriggerAsaasWebhookTest(false)}
+                      className="rounded-full bg-[#ff5500] px-3.5 py-2 text-[11px] font-medium text-white"
+                    >
+                      Testar PIX Recebido (+R$ 250,00)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleTriggerAsaasWebhookTest(true)}
+                      className="rounded-full nexo-card px-3 py-2 text-[11px] font-medium hover:text-[#ff5500] transition-colors"
+                    >
+                      Testar Trava Duplicidade
+                    </button>
+                  </div>
+                </div>
+
+                {/* Webhook Pluggy */}
+                <div className="rounded-2xl nexo-elevated p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading text-xs">
+                      Webhook Pluggy Open Finance
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleCopyWebhookEndpoint('/api/webhooks/pluggy')
+                      }
+                      className="inline-flex items-center gap-1 rounded-full nexo-card px-2.5 py-1 text-[11px] hover:text-[#ff5500] transition-colors"
+                    >
+                      {copiedWebhookUrl === '/api/webhooks/pluggy' ? (
+                        <>
+                          <Check className="h-3 w-3 text-[#ff5500]" />
+                          <span>Copiado</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          <span>Copiar URL</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="font-mono text-[11px] nexo-text-secondary break-all">
+                    https://nexo.eximiatech.com.br/api/webhooks/pluggy
+                  </p>
+                  <p className="nexo-text-muted text-[11px]">
+                    Eventos: <code>item/updated</code> e{' '}
+                    <code>transactions/created</code> (atualização de saldo noturna).
+                  </p>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => void handleTriggerPluggyWebhookTest()}
+                      className="rounded-full bg-[#ff5500] px-3.5 py-2 text-[11px] font-medium text-white"
+                    >
+                      Testar Sync Noturno Pluggy
+                    </button>
+                  </div>
+                </div>
+
+                {/* Gateway BFF Mobile & Angular */}
+                <div className="rounded-2xl nexo-elevated p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading text-xs">
+                      Gateway BFF (Mobile e Angular)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleCopyWebhookEndpoint('/api/v1/mobile')
+                      }
+                      className="inline-flex items-center gap-1 rounded-full nexo-card px-2.5 py-1 text-[11px] hover:text-[#ff5500] transition-colors"
+                    >
+                      {copiedWebhookUrl === '/api/v1/mobile' ? (
+                        <>
+                          <Check className="h-3 w-3 text-[#ff5500]" />
+                          <span>Copiado</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          <span>Copiar URL</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="font-mono text-[11px] nexo-text-secondary break-all">
+                    https://nexo.eximiatech.com.br/api/v1/mobile
+                  </p>
+                  <p className="nexo-text-muted text-[11px]">
+                    API centralizada para o app React Native (<code>nexo-mobile</code>) e Portal Corporativo Angular com CORS ativo e zero segredos no cliente.
+                  </p>
+                </div>
+              </div>
+
+              {webhookStatusFeedback && (
+                <div className="rounded-2xl border border-[#ff5500]/40 bg-[#ff5500]/10 p-3.5 text-xs font-medium">
+                  {webhookStatusFeedback}
+                </div>
+              )}
+
+              {webhookAuditLogs.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
+                  <span className="text-xs font-heading block">
+                    Log de Auditoria de Webhooks em Tempo Real
+                  </span>
+                  <div className="space-y-2">
+                    {webhookAuditLogs.map((log, idx) => (
+                      <div
+                        key={`${log.idempotencyKey}-${idx}`}
+                        className="rounded-2xl nexo-elevated p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                      >
+                        <div>
+                          <span className="font-mono font-medium text-[#ff5500]">
+                            [{log.provider}] {log.eventName}
+                          </span>
+                          <p className="nexo-text-secondary text-[11px]">
+                            {log.description}
+                          </p>
+                        </div>
+                        <span className="rounded-full nexo-card px-3 py-1 text-[11px] font-mono">
+                          {log.outcome}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* SEÇÃO SEGURANÇA BANCÁRIA E LIMITES OPERACIONAIS PIX (RESOLUÇÃO BCB Nº 142/2021) */}

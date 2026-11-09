@@ -9,6 +9,7 @@ import {
   RecurringSubscription,
   RegisteredPixKey,
   Transaction,
+  WebhookReconciliationEngine,
   applyFinancialFeeRule,
   describePaymentMethod,
 } from '../index';
@@ -237,5 +238,56 @@ describe('Domain Layer — Entities OOP, Tuplas e Regras de Negócio', () => {
       isPrimary: true,
     });
     expect(pixKeyEither.isRight()).toBe(true);
+  });
+
+  it('deve garantir liquidação idempotente nos Webhooks Asaas PIX e Pluggy Open Finance sem duplicar saldo', () => {
+    const engine = new WebhookReconciliationEngine();
+
+    const parsed = engine.parseAsaasPayload({
+      event: 'PAYMENT_RECEIVED',
+      payment: {
+        id: 'pay_998877',
+        value: 350.0,
+        description: 'Cobrança QR Code PIX Cliente',
+      },
+    });
+    expect(parsed.isRight()).toBe(true);
+
+    // 1ª notificação Asaas (PAYMENT_RECEIVED): liquida crédito normalmente
+    const firstSettlement = engine.settleAsaasEvent({
+      eventName: 'PAYMENT_RECEIVED',
+      resourceId: 'pay_998877',
+      confirmedValueBrl: 350.0,
+      description: 'Cobrança QR Code PIX Cliente',
+      verifiedWithRemoteApi: true,
+    });
+    expect(firstSettlement.outcome).toBe('SETTLED_CREDIT');
+    expect(firstSettlement.suggestedTransaction?.amountCents).toBe(35000);
+
+    // 2ª notificação Asaas para o MESMO pagamento (PAYMENT_CONFIRMED): bloqueada pela trava de idempotência!
+    const duplicateSettlement = engine.settleAsaasEvent({
+      eventName: 'PAYMENT_CONFIRMED',
+      resourceId: 'pay_998877',
+      confirmedValueBrl: 350.0,
+      description: 'Cobrança QR Code PIX Cliente',
+      verifiedWithRemoteApi: true,
+    });
+    expect(duplicateSettlement.outcome).toBe('ALREADY_PROCESSED');
+    expect(duplicateSettlement.suggestedTransaction).toBeUndefined();
+
+    // Webhook Pluggy Open Finance (atualização noturna de saldo)
+    const pluggyResult = engine.settlePluggyEvent(
+      {
+        event: 'item/updated',
+        itemId: 'item_santander_033',
+        eventId: 'evt_pluggy_01',
+        balance: 15420.5,
+      },
+      true,
+    );
+    expect(pluggyResult.isRight()).toBe(true);
+    if (pluggyResult.isRight()) {
+      expect(pluggyResult.value.outcome).toBe('BALANCE_UPDATED');
+    }
   });
 });
