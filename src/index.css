@@ -109,18 +109,26 @@ html[data-theme="light"] .bg-\[\#121215\] {
   border-color: rgba(9, 9, 11, 0.1) !important;
 }
 
-/* Botões, badges ativas e pills com fundo laranja têm SEMPRE texto e ícones brancos */
-.bg-\[\#ff5500\],
-.bg-\[\#ef5000\],
-[class*="bg-[#ff5500]"],
-[class*="bg-[#ef5000]"] {
+/* Seleção de texto nativa */
+::selection {
+  background-color: rgba(255, 85, 0, 0.25);
+  color: #ff5500;
+}
+
+/* Botões, links de ação e badges com fundo laranja sólido: texto e ícones estritamente brancos para contraste */
+button.bg-\[\#ff5500\],
+button.bg-\[\#ef5000\],
+a.bg-\[\#ff5500\],
+a.bg-\[\#ef5000\],
+.btn-orange-solid {
   color: #ffffff !important;
 }
 
-.bg-\[\#ff5500\] *,
-.bg-\[\#ef5000\] *,
-[class*="bg-[#ff5500]"] *,
-[class*="bg-[#ef5000]"] * {
+button.bg-\[\#ff5500\] *,
+button.bg-\[\#ef5000\] *,
+a.bg-\[\#ff5500\] *,
+a.bg-\[\#ef5000\] *,
+.btn-orange-solid * {
   color: #ffffff !important;
   stroke: #ffffff !important;
 }

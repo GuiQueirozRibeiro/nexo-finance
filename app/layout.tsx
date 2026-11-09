@@ -51,7 +51,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-screen nexo-page antialiased selection:bg-[#ff5500]/20 selection:text-[#ff5500] transition-colors duration-200">
+      <body className="min-h-screen nexo-page antialiased transition-colors duration-200">
         {children}
       </body>
     </html>

@@ -14,3 +14,4 @@ Instruções mandatórias para Antigravity, Codex, Cursor, Claude e qualquer age
    - As credenciais vivem unicamente em `.env.local` (ignorado pelo git) e no painel da Vercel / Firebase Console.
 5. **VERIFICAÇÃO OBRIGATÓRIA ANTES DE COMMITS:**
    - Antes de qualquer commit, valide com `git diff --staged` e confirme que nenhum arquivo rastreado contenha tokens, chaves ou credenciais.
+
