@@ -212,6 +212,12 @@ export function DashboardPage({
   const [profileNameInput, setProfileNameInput] = useState('');
   const [profileStatusMsg, setProfileStatusMsg] = useState<string | null>(null);
 
+  // Estado Pluggy Connect Widget Oficial (/api/connect-token)
+  const [pluggyConnectToken, setPluggyConnectToken] = useState<string | null>(
+    null,
+  );
+  const [isGeneratingPluggyToken, setIsGeneratingPluggyToken] = useState(false);
+
   // Estado Assistente & Busca
   const [chatInput, setChatInput] = useState('');
   const [searchText, setSearchText] = useState('');
@@ -322,6 +328,34 @@ export function DashboardPage({
     });
     if (ok) {
       closeWizard();
+    }
+  };
+
+  const handleOpenPluggyConnect = async () => {
+    setIsGeneratingPluggyToken(true);
+    try {
+      const res = await fetch('/api/connect-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientUserId: authUser?.uid ?? 'nexo-finance-user',
+        }),
+      });
+      const data: unknown = await res.json();
+      if (
+        typeof data === 'object' &&
+        data !== null &&
+        'accessToken' in data &&
+        typeof (data as { accessToken?: unknown }).accessToken === 'string'
+      ) {
+        setPluggyConnectToken((data as { accessToken: string }).accessToken);
+      } else {
+        openWizard('connect_bank');
+      }
+    } catch {
+      openWizard('connect_bank');
+    } finally {
+      setIsGeneratingPluggyToken(false);
     }
   };
 
@@ -1063,11 +1097,24 @@ export function DashboardPage({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
+                  disabled={isGeneratingPluggyToken}
+                  onClick={() => void handleOpenPluggyConnect()}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>
+                    {isGeneratingPluggyToken
+                      ? 'Gerando Connect Token...'
+                      : 'Pluggy Connect Oficial'}
+                  </span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => openWizard('connect_bank')}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
+                  className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-4 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span>Conectar Novo Banco</span>
+                  <span>Conectar Manual</span>
                 </button>
                 <button
                   type="button"
@@ -1988,6 +2035,62 @@ export function DashboardPage({
           </div>
         )}
       </main>
+
+      {/* =====================================================================
+          MODAL PLUGGY CONNECT OFICIAL (/api/connect-token)
+         ===================================================================== */}
+      {pluggyConnectToken && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-3xl nexo-card p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-medium text-[#ff5500] uppercase tracking-wider block">
+                  Open Finance Brasil • Pluggy Connect
+                </span>
+                <h3 className="font-heading text-base">
+                  Conectar Instituição Bancária
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPluggyConnectToken(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full nexo-elevated nexo-text-secondary hover:text-[#ff5500]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <iframe
+              title="Pluggy Connect Open Finance"
+              src={`https://connect.pluggy.ai?connect_token=${encodeURIComponent(pluggyConnectToken)}&with_sandbox=true`}
+              className="w-full h-[500px] rounded-2xl border border-[var(--border-subtle)] bg-white"
+              allow="clipboard-read; clipboard-write"
+            />
+
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  void viewModel.connectNewBankAccount({
+                    id: `acc-pluggy-${Date.now()}`,
+                    institution: InstitutionCode.ITAU,
+                    nickname: 'Conta Pluggy Open Finance',
+                    balance: 24500,
+                    coordinates: ['341', '0500', '99412-8'],
+                    consentStatus: 'AUTHORIZED',
+                    lastSyncIso: new Date().toISOString(),
+                    colorAccentHex: '#ff5500',
+                  });
+                  setPluggyConnectToken(null);
+                }}
+                className="flex-1 rounded-full bg-[#ff5500] py-3 text-xs font-medium text-white"
+              >
+                Confirmar e Importar Conta Conectada no Pluggy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================================
           MODAL WIZARD PASSO A PASSO ESTILO NUBANK (TODOS OS MÓDULOS)

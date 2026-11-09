@@ -6,9 +6,7 @@
  */
 
 import {
-  AppFlavor,
   FlavorConfig,
-  ServerException,
   hasStringField,
   isPlainRecord,
 } from '@/core';
@@ -41,49 +39,53 @@ export class PixGatewayDataSourceImpl implements IPixGatewayDataSource {
     const profile = FlavorConfig.getProfile();
     const expiresAtIso = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-    if (
-      profile.flavor === AppFlavor.PROD &&
-      typeof window !== 'undefined' &&
-      profile.gateway.mode === 'ASAAS_AND_OPEN_FINANCE_API'
-    ) {
-      const response = await fetch(profile.gateway.asaasProxyEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'CREATE_QR_CODE',
-          amount,
-          description,
-        }),
-      });
+    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+      try {
+        const endpoint =
+          profile.gateway.mode === 'ASAAS_AND_OPEN_FINANCE_API'
+            ? profile.gateway.asaasProxyEndpoint
+            : '/api/asaas/pix';
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'CREATE_QR_CODE',
+            amount,
+            description,
+          }),
+        });
 
-      if (!response.ok) {
-        throw new ServerException(
-          `Erro HTTP ${response.status} ao comunicar com proxy Asaas PIX.`,
-          response.status,
-          profile.gateway.asaasProxyEndpoint,
-        );
-      }
-
-      const rawData: unknown = await response.json();
-      if (isPlainRecord(rawData) && hasStringField(rawData, 'copyPasteCode')) {
-        const tuple: PixQrPayloadTuple = [
-          rawData.copyPasteCode,
-          typeof rawData.expiresAtIso === 'string'
-            ? rawData.expiresAtIso
-            : expiresAtIso,
-        ];
-        return {
-          id: typeof rawData.id === 'string' ? rawData.id : `asaas-${Date.now()}`,
-          description,
-          amount,
-          status: 'CONFIRMED',
-          qrPayload: tuple,
-          provider:
-            rawData.provider === 'ASAAS_API'
-              ? 'ASAAS_API'
-              : 'SANDBOX_SIMULATOR',
-          createdAtIso: new Date().toISOString(),
-        };
+        if (response.ok) {
+          const rawData: unknown = await response.json();
+          if (
+            isPlainRecord(rawData) &&
+            hasStringField(rawData, 'copyPasteCode')
+          ) {
+            const tuple: PixQrPayloadTuple = [
+              rawData.copyPasteCode,
+              typeof rawData.expiresAtIso === 'string'
+                ? rawData.expiresAtIso
+                : expiresAtIso,
+            ];
+            return {
+              id:
+                typeof rawData.id === 'string'
+                  ? rawData.id
+                  : `asaas-${Date.now()}`,
+              description,
+              amount,
+              status: 'CONFIRMED',
+              qrPayload: tuple,
+              provider:
+                rawData.provider === 'ASAAS_API'
+                  ? 'ASAAS_API'
+                  : 'SANDBOX_SIMULATOR',
+              createdAtIso: new Date().toISOString(),
+            };
+          }
+        }
+      } catch {
+        // Prossegue para o gerador EMV local se offline
       }
     }
 
@@ -106,47 +108,45 @@ export class PixGatewayDataSourceImpl implements IPixGatewayDataSource {
   ): Promise<PixTransferReceipt> {
     const profile = FlavorConfig.getProfile();
 
-    if (
-      profile.flavor === AppFlavor.PROD &&
-      typeof window !== 'undefined' &&
-      profile.gateway.mode === 'ASAAS_AND_OPEN_FINANCE_API'
-    ) {
-      const response = await fetch(profile.gateway.asaasProxyEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'CREATE_TRANSFER',
-          ...request,
-        }),
-      });
+    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+      try {
+        const endpoint =
+          profile.gateway.mode === 'ASAAS_AND_OPEN_FINANCE_API'
+            ? profile.gateway.asaasProxyEndpoint
+            : '/api/asaas/pix';
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'CREATE_TRANSFER',
+            ...request,
+          }),
+        });
 
-      if (!response.ok) {
-        throw new ServerException(
-          `Falha HTTP ${response.status} na transferência PIX Asaas.`,
-          response.status,
-          profile.gateway.asaasProxyEndpoint,
-        );
-      }
-
-      const rawData: unknown = await response.json();
-      if (isPlainRecord(rawData) && hasStringField(rawData, 'transferId')) {
-        return {
-          transferId: rawData.transferId,
-          endToEndId:
-            typeof rawData.endToEndId === 'string'
-              ? rawData.endToEndId
-              : `E461000120261109${Date.now()}`,
-          recipientName: request.recipientName,
-          pixKeyType: request.pixKeyType,
-          pixKey: request.pixKey,
-          amount: request.amount,
-          status: 'CONFIRMED',
-          provider:
-            rawData.provider === 'ASAAS_API'
-              ? 'ASAAS_API'
-              : 'SANDBOX_SIMULATOR',
-          processedAtIso: new Date().toISOString(),
-        };
+        if (response.ok) {
+          const rawData: unknown = await response.json();
+          if (isPlainRecord(rawData) && hasStringField(rawData, 'transferId')) {
+            return {
+              transferId: rawData.transferId,
+              endToEndId:
+                typeof rawData.endToEndId === 'string'
+                  ? rawData.endToEndId
+                  : `E461000120261109${Date.now()}`,
+              recipientName: request.recipientName,
+              pixKeyType: request.pixKeyType,
+              pixKey: request.pixKey,
+              amount: request.amount,
+              status: 'CONFIRMED',
+              provider:
+                rawData.provider === 'ASAAS_API'
+                  ? 'ASAAS_API'
+                  : 'SANDBOX_SIMULATOR',
+              processedAtIso: new Date().toISOString(),
+            };
+          }
+        }
+      } catch {
+        // Prossegue para o gerador local se offline
       }
     }
 

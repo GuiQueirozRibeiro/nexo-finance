@@ -21,8 +21,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const asaasApiKey = process.env.ASAAS_API_KEY?.trim();
-    const asaasBaseUrl =
-      process.env.ASAAS_BASE_URL?.trim() || 'https://sandbox.asaas.com/api/v3';
+    const defaultBaseUrl = asaasApiKey?.startsWith('$aact_prod_')
+      ? 'https://api.asaas.com/api/v3'
+      : 'https://sandbox.asaas.com/api/v3';
+    const asaasBaseUrl = process.env.ASAAS_BASE_URL?.trim() || defaultBaseUrl;
 
     if (rawBody.action === 'CREATE_QR_CODE') {
       const amount = hasNumberField(rawBody, 'amount') ? rawBody.amount : 100;
