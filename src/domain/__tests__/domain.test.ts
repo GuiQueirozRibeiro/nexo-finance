@@ -5,6 +5,8 @@ import {
   PierreFinancialEngine,
   PixKeyValidator,
   Transaction,
+  applyFinancialFeeRule,
+  describePaymentMethod,
 } from '../index';
 
 describe('Domain Layer — Entities OOP, Tuplas e Regras de Negócio', () => {
@@ -132,5 +134,50 @@ describe('Domain Layer — Entities OOP, Tuplas e Regras de Negócio', () => {
       [dup1, dup2],
     );
     expect(answer).toContain('Spotify');
+  });
+
+  it('deve suportar sobrecarga de funções (lookupTransaction), uniões discriminadas (describePaymentMethod) e tipos de função (applyFinancialFeeRule)', () => {
+    const tx1 = new Transaction({
+      id: 'ov-1',
+      title: 'PIX Cliente',
+      amount: 500,
+      type: 'INCOME',
+      category: TransactionCategory.PIX,
+      institution: InstitutionCode.ASAAS,
+      dateIso: '2026-11-09',
+    });
+    const tx2 = new Transaction({
+      id: 'ov-2',
+      title: 'Almoço Executivo',
+      amount: 85,
+      type: 'EXPENSE',
+      category: TransactionCategory.FOOD,
+      institution: InstitutionCode.NUBANK,
+      dateIso: '2026-11-09',
+    });
+
+    // Sobrecarga 1: busca por índice (number) -> retorna Transaction | undefined
+    const byIndex = Transaction.lookupTransaction([tx1, tx2], 0);
+    expect(byIndex?.id).toBe('ov-1');
+
+    // Sobrecarga 2: busca por categoria (TransactionCategory) -> retorna readonly Transaction[]
+    const byCategory = Transaction.lookupTransaction(
+      [tx1, tx2],
+      TransactionCategory.FOOD,
+    );
+    expect(byCategory).toHaveLength(1);
+    expect(byCategory[0]?.id).toBe('ov-2');
+
+    // União discriminada
+    const pixDesc = describePaymentMethod({
+      kind: 'pix',
+      pixKey: 'financeiro@eximiatech.com.br',
+      instantSettlement: true,
+    });
+    expect(pixDesc).toContain('liquidação imediata');
+
+    // Tipo de função (Function Type Alias)
+    const netAfterAsaasFee = applyFinancialFeeRule(1000, (val) => val * 0.9901);
+    expect(netAfterAsaasFee).toBe(990.1);
   });
 });

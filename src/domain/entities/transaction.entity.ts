@@ -149,4 +149,27 @@ export class Transaction {
     const total = items.reduce((acc, tx) => acc + tx.signedAmount, 0);
     return Number(total.toFixed(2));
   }
+
+  /**
+   * SOBRECARGA DE FUNÇÕES (Function Overloading — Etapa 3 / Playground Etapas 2 e 3):
+   * - Quando acionado com `index: number`, retorna uma única `Transaction | undefined`.
+   * - Quando acionado com `category: TransactionCategory`, retorna `readonly Transaction[]`.
+   */
+  public static lookupTransaction(
+    items: readonly Transaction[],
+    index: number,
+  ): Transaction | undefined;
+  public static lookupTransaction(
+    items: readonly Transaction[],
+    category: TransactionCategory,
+  ): readonly Transaction[];
+  public static lookupTransaction(
+    items: readonly Transaction[],
+    key: number | TransactionCategory,
+  ): Transaction | undefined | readonly Transaction[] {
+    if (typeof key === 'number') {
+      return items[key];
+    }
+    return items.filter((tx) => tx.category === key);
+  }
 }

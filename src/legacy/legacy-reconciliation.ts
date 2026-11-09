@@ -18,7 +18,6 @@ import {
   type Failure,
   ValidationFailure,
   assertNever,
-  hasNumberField,
   hasStringField,
   isPlainRecord,
   left,
@@ -128,6 +127,31 @@ export class RefactoredReconciliationService {
   }
 
   /**
+   * Validador estrito de números para campos vindos de JSON/API externa (alinhado ao exercício
+   * `numeroValido(valor: unknown, campo: string)` da Etapa 1, sem uso de `any` nem `as`).
+   */
+  public static numeroValido(
+    valor: unknown,
+    campo: string,
+  ): Either<Failure, number> {
+    if (typeof valor === 'number' && Number.isFinite(valor)) {
+      return right(valor);
+    }
+    if (typeof valor === 'string' && valor.trim() !== '') {
+      const convertido = Number(valor);
+      if (Number.isFinite(convertido)) {
+        return right(convertido);
+      }
+    }
+    return left(
+      new ValidationFailure(
+        `Campo numérico "${campo}" inválido na leitura da API: ${String(valor)}`,
+        campo,
+      ),
+    );
+  }
+
+  /**
    * Converte e valida um item bruto (`unknown`) vindo de fonte externa antes do cálculo.
    */
   public static parseUnknownInput(
@@ -145,29 +169,15 @@ export class RefactoredReconciliationService {
       );
     }
 
-    // Corrige o Bug 1 do JS legado: rejeita ou converte explicitamente strings numéricas válidas
-    let parsedAmount: number;
-    if (hasNumberField(raw, 'amount')) {
-      parsedAmount = raw.amount;
-    } else if (typeof raw.amount === 'string' && raw.amount.trim() !== '') {
-      const coerced = Number(raw.amount);
-      if (!Number.isFinite(coerced)) {
-        return left(
-          new ValidationFailure(
-            `Valor monetário inválido ("${raw.amount}") no item ${raw.id}.`,
-            'amount',
-          ),
-        );
-      }
-      parsedAmount = coerced;
-    } else {
-      return left(
-        new ValidationFailure(
-          `Campo "amount" ausente ou inválido no item ${raw.id}.`,
-          'amount',
-        ),
-      );
+    // Corrige o Bug 1 do JS legado usando numeroValido(unknown) sem `any` nem `as`
+    const amountCheck = RefactoredReconciliationService.numeroValido(
+      raw.amount,
+      'amount',
+    );
+    if (amountCheck.isLeft()) {
+      return left(amountCheck.value);
     }
+    const parsedAmount = amountCheck.value;
 
     if (parsedAmount <= 0) {
       return left(

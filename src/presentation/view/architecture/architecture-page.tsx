@@ -54,26 +54,25 @@ export type OpenFinanceConsentStatus = 'AUTHORIZED' | 'EXPIRED' | 'REVOKED';`,
   {
     id: '1.3',
     competencyGroup: 'C1',
-    rubricTitle: '1.3 Objetos tipados e funções seguras nas regras de negócio',
+    rubricTitle: '1.3 Objetos tipados, sobrecarga de funções e regras seguras',
     filePath: 'src/domain/entities/transaction.entity.ts',
     explanation:
-      'Valida propriedades de entrada com `Transaction.validateProps` retornando `Either<Failure, Transaction>` em vez de lançar exceções não rastreadas.',
-    codeSnippet: `public static validateProps(props: TransactionProps): Either<Failure, Transaction> {
-  if (!Number.isFinite(props.amount) || props.amount <= 0) {
-    return left(new ValidationFailure('O valor deve ser positivo.', 'amount'));
-  }
-  return right(new Transaction(props));
-}`,
+      'Valida propriedades com `Transaction.validateProps` retornando `Either<Failure, Transaction>` e aplica sobrecarga de função em `Transaction.lookupTransaction` (por índice `number` ou por `TransactionCategory`).',
+    codeSnippet: `public static lookupTransaction(items: readonly Transaction[], index: number): Transaction | undefined;
+public static lookupTransaction(items: readonly Transaction[], category: TransactionCategory): readonly Transaction[];
+public static lookupTransaction(items: readonly Transaction[], key: number | TransactionCategory) { ... }`,
   },
   {
     id: '1.4',
     competencyGroup: 'C1',
-    rubricTitle: '1.4 Combinação de uniões, literais e funções para cenários do domínio',
-    filePath: 'src/domain/entities/financial-insight.entity.ts',
+    rubricTitle: '1.4 Uniões discriminadas, literais e funções no domínio',
+    filePath: 'src/domain/entities/financial-primitives.ts',
     explanation:
-      'Combina status de orçamento (`WITHIN_IDEAL | NEAR_LIMIT | EXCEEDED`), severidades (`INFO | WARNING | CRITICAL`) e funções puras no motor PierreFinancialEngine.',
-    codeSnippet: `const status: CategoryBreakdownItem['status'] =
-  spent > maxCeiling ? 'EXCEEDED' : spent > idealLimit ? 'NEAR_LIMIT' : 'WITHIN_IDEAL';`,
+      'Modela meios de pagamento com União Discriminada (`PaymentMethodDetail` por `kind: "pix" | "card" | "open_finance"`), função `describePaymentMethod` e status de orçamento no PierreFinancialEngine.',
+    codeSnippet: `export type PaymentMethodDetail = PixPaymentDetail | CreditCardPaymentDetail | OpenFinanceDebitDetail;
+export function describePaymentMethod(payment: PaymentMethodDetail): string {
+  switch (payment.kind) { case 'pix': ... case 'card': ... case 'open_finance': ... }
+}`,
   },
   {
     id: '2.1',

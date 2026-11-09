@@ -1,6 +1,7 @@
 # Projeto de Disciplina — TypeScript para Desenvolvimento Front-end
 
 **Aluno:** Guilherme Queiroz Ribeiro
+**Professor:** Kennedy Carvalho
 **Disciplina:** TypeScript para Desenvolvimento Front-end [26E4_2]
 **Data:** 09/11/2026
 
@@ -8,7 +9,7 @@
 
 O **Nexo Finance** (by Exímia Tech) é uma plataforma de controle financeiro inteligente que integra o ecossistema **Open Finance Brasil**, um motor de análise de gastos e detecção de anomalias inspirado no **Pierre Finance**, e operações de conta digital com emissão de **QR Code PIX e transferências via Asaas**.
 
-O objetivo técnico central é demonstrar a construção de um módulo front-end previsível, seguro em tempo de compilação e sustentável, combinando **Clean Architecture (3 camadas + Core)**, **Princípios SOLID**, **MVVM** e **Flavors de Ambiente (`DEV` / `PROD`)** inspirados no projeto de referência `App_Nasa`.
+O objetivo técnico central é demonstrar a construção de um módulo front-end previsível, seguro em tempo de compilação e sustentável, combinando **Clean Architecture (3 camadas + Core)**, **Princípios SOLID**, **MVVM** e **Flavors de Ambiente (`DEV` / `PROD`)** inspirados no projeto de referência `App_Nasa`. As camadas `core/`, `domain/` e `data/` são 100% agnósticas de framework visual, permitindo reuso direto na disciplina subsequente de **Angular** e na versão mobile em **React Native + Expo**.
 
 ---
 
@@ -27,9 +28,9 @@ A estrutura em `src/` isola regras de negócio e contratos de tipos de qualquer 
 ## 3. Atendimento às 6 Etapas e 16 Itens da Rubrica
 
 ### 3.1. Fundamentos e Modelagem Inicial (Competência 1)
-- **Tipos Primitivos, Uniões e Literais (`src/domain/entities/financial-primitives.ts`):** Definidos tipos literais e uniões alinhados às regras financeiras: `TransactionType = 'INCOME' | 'EXPENSE' | 'PIX_TRANSFER'`, `PixKeyType = 'CPF' | 'EMAIL' | 'PHONE' | 'RANDOM'`, `OpenFinanceConsentStatus = 'AUTHORIZED' | 'EXPIRED' | 'REVOKED'` e `FailureSeverity = 'LOW' | 'MEDIUM' | 'HIGH'`.
+- **Tipos Primitivos, Uniões, Literais e Uniões Discriminadas (`src/domain/entities/financial-primitives.ts`):** Definidos tipos literais e uniões alinhados às regras financeiras (`TransactionType = 'INCOME' | 'EXPENSE' | 'PIX_TRANSFER'`, `PixKeyType = 'CPF' | 'EMAIL' | 'PHONE' | 'RANDOM'`, `OpenFinanceConsentStatus = 'AUTHORIZED' | 'EXPIRED' | 'REVOKED'`) e a união discriminada `PaymentMethodDetail = PixPaymentDetail | CreditCardPaymentDetail | OpenFinanceDebitDetail` processada por `describePaymentMethod(payment)` com estreitamento automático por `payment.kind`.
 - **Inferência vs. Tipagem Explícita:** Tipagem explícita adotada em todas as assinaturas públicas de métodos, interfaces e retornos de *UseCases* (`Promise<Either<Failure, T>>`), enquanto a inferência do TypeScript é aproveitada em acumuladores internos (`reduce`, `filter`) e constantes imutáveis (`as const`).
-- **Objetos Tipados e Funções Seguras:** Criação validada por `Transaction.validateProps(props): Either<Failure, Transaction>`, impedindo valores negativos ou descrições vazias antes de instanciar a entidade.
+- **Objetos Tipados, Tipos de Função e Sobrecarga de Funções:** Criação validada por `Transaction.validateProps(props): Either<Failure, Transaction>`, aplicação de regras via contrato funcional `FinancialFeeRule = (amount: number) => number` (`applyFinancialFeeRule`) e **sobrecarga de funções** (*Function Overloading*) em `Transaction.lookupTransaction(items, key)` (retornando `Transaction | undefined` quando buscado por `index: number` ou `readonly Transaction[]` quando filtrado por `category: TransactionCategory`).
 
 ### 3.2. Estruturação de Contratos e Organização (Competência 2)
 - **Interfaces e Contratos (`src/domain/repositories/repositories.ts`):** Interfaces enxutas aplicando *Interface Segregation* e *Dependency Inversion*. Uso de interseção (`&`) em `DomainRecordMetadata = IdentifiableContract & AuditableContract` e tipagem de funções em `FoldCallback<Input, Output>` e `ViewStateListener`.
@@ -69,7 +70,7 @@ A estrutura em `src/` isola regras de negócio e contratos de tipos de qualquer 
 
 No módulo `src/legacy/legacy-reconciliation.ts`, foi registrada a migração de uma rotina de conciliação de pagamentos originalmente escrita em JavaScript sem tipagem estática para a classe `RefactoredReconciliationService`:
 
-1. **Problema 1 (Coerção de String):** No JS legado, quando `item.amount` vinha como string (`"250.50"`), o operador `+=` concatenava strings (`"1000250.50"`). Na versão refatorada, `parseUnknownInput(raw: unknown)` valida e converte explicitamente valores numéricos ou retorna `Left(ValidationFailure)`.
+1. **Problema 1 (Coerção de String):** No JS legado, quando `item.amount` vinha como string (`"250.50"`), o operador `+=` concatenava strings (`"1000250.50"`). Na versão refatorada, o validador `RefactoredReconciliationService.numeroValido(valor: unknown, campo: string)` refina o tipo sem uso de `any` nem `as` e retorna `Either<Failure, number>`.
 2. **Problema 2 (`NaN` Silencioso):** No JS legado, `item.feeOverridePercent !== null` permitia a passagem de `undefined`, resultando em `NaN` na multiplicação da taxa. Na versão TypeScript, o estreitamento `typeof item.feeOverridePercent === 'number'` garante cálculo seguro.
 3. **Problema 3 (Switch Incompleto):** Novas modalidades como `'OPEN_FINANCE_DIRECT'` não possuíam tratamento no JS legado. Na versão TypeScript, `resolveTierFeeRate(tier: SettlementTier)` utiliza `assertNever(tier)` no bloco `default`.
 
@@ -95,6 +96,6 @@ npm install          # Instala dependências e pacotes @types/*
 npm run typecheck    # Validação estática de tipos (tsc --noEmit)
 npm run build:core   # Transpila core, domain, data e legacy para dist-core/ com Source Maps (.js.map)
 npm run lint         # ESLint estrito (regra no-explicit-any ativa)
-npm test             # Executa os 15 testes unitários no Vitest (core, domain, data, legacy e viewmodel)
+npm test             # Executa os 17 testes unitários no Vitest (core, domain, data, legacy e viewmodel)
 npm run dev          # Inicia a aplicação em http://localhost:3000
 ```
