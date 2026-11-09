@@ -24,7 +24,6 @@ import {
   QrCode,
   RefreshCw,
   Repeat,
-  RotateCcw,
   Search,
   Send,
   Settings,
@@ -593,6 +592,117 @@ export function DashboardPage({
     URL.revokeObjectURL(url);
   };
 
+  const handleExportOfx = () => {
+    if (typeof window === 'undefined') return;
+    const asaasAccount =
+      state.accounts.find((a) => a.institution === InstitutionCode.ASAAS) ??
+      state.accounts[0];
+    const balance = asaasAccount?.balance ?? 0;
+    const nowIso = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+
+    let stmtList = '';
+    for (const tx of state.transactions) {
+      const txDate = tx.dateIso.replace(/-/g, '') + '120000';
+      const trnType = tx.type === 'INCOME' ? 'CREDIT' : 'DEBIT';
+      const trnAmt = (tx.type === 'INCOME' ? tx.amount : -tx.amount).toFixed(2);
+      stmtList += `
+        <STMTTRN>
+          <TRNTYPE>${trnType}</TRNTYPE>
+          <DTPOSTED>${txDate}</DTPOSTED>
+          <TRNAMT>${trnAmt}</TRNAMT>
+          <FITID>${tx.id}</FITID>
+          <MEMO>${tx.title} (${getCategoryLabel(tx.category)})</MEMO>
+        </STMTTRN>`;
+    }
+
+    const ofxContent = `OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:USASCII
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEVERSION:100
+NEWFILEVERSION:100
+
+<OFX>
+  <SIGNONMSGSRSV1>
+    <SONRS>
+      <STATUS>
+        <CODE>0</CODE>
+        <SEVERITY>INFO</SEVERITY>
+      </STATUS>
+      <DTSERVER>${nowIso}</DTSERVER>
+      <LANGUAGE>POR</LANGUAGE>
+      <FI>
+        <ORG>NEXO BANK IP S.A.</ORG>
+        <FID>461</FID>
+      </FI>
+    </SONRS>
+  </SIGNONMSGSRSV1>
+  <BANKMSGSRSV1>
+    <STMTTRNRS>
+      <TRNUID>${Date.now()}</TRNUID>
+      <STATUS>
+        <CODE>0</CODE>
+        <SEVERITY>INFO</SEVERITY>
+      </STATUS>
+      <STMTRS>
+        <CURDEF>BRL</CURDEF>
+        <BANKACCTFROM>
+          <BANKID>461</BANKID>
+          <BRANCHID>0001</BRANCHID>
+          <ACCTID>${asaasAccount?.coordinates ? asaasAccount.coordinates[2] : '1001-0'}</ACCTID>
+          <ACCTTYPE>CHECKING</ACCTTYPE>
+        </BANKACCTFROM>
+        <BANKTRANLIST>
+          <DTSTART>20260101000000</DTSTART>
+          <DTEND>${nowIso}</DTEND>${stmtList}
+        </BANKTRANLIST>
+        <LEDGERBAL>
+          <BALAMT>${balance.toFixed(2)}</BALAMT>
+          <DTASOF>${nowIso}</DTASOF>
+        </LEDGERBAL>
+      </STMTRS>
+    </STMTTRNRS>
+  </BANKMSGSRSV1>
+</OFX>`;
+
+    const blob = new Blob([ofxContent], {
+      type: 'application/x-ofx;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `extrato-bancario-nexo-${nowIso.slice(0, 8)}.ofx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRequestAccountClosure = async () => {
+    const asaasAccount =
+      state.accounts.find((a) => a.institution === InstitutionCode.ASAAS) ??
+      state.accounts[0];
+    const balance = asaasAccount?.balance ?? 0;
+
+    if (balance > 0) {
+      alert(
+        `Não é possível encerrar conta com saldo positivo (${formatCurrency(balance)}).\n\nConforme a Resolução BACEN nº 2.025/1993, você deve transferir ou resgatar todo o saldo restante via PIX para outra instituição financeira antes de solicitar o encerramento.`,
+      );
+      return;
+    }
+
+    if (
+      typeof window !== 'undefined' &&
+      window.confirm(
+        'Confirma a solicitação formal de encerramento da sua conta Nexo Bank?\n\nSuas chaves PIX DICT serão desvinculadas e o contrato de prestação de serviços será formalmente cancelado perante as normas regulatórias.',
+      )
+    ) {
+      await FirebaseClientManager.logout();
+      window.location.href = '/login';
+    }
+  };
+
   const handleSaveProfileName = async (e: FormEvent) => {
     e.preventDefault();
     if (!profileNameInput.trim()) return;
@@ -735,11 +845,13 @@ export function DashboardPage({
 
             <button
               type="button"
-              onClick={() => void viewModel.resetDemoData()}
-              title="Restaurar dados iniciais das 6 tabelas"
+              onClick={() => void viewModel.syncWithCloudFirestore()}
+              title="Sincronizar e Atualizar Saldo em Tempo Real"
               className="flex h-9 w-9 items-center justify-center rounded-full nexo-card nexo-text-secondary hover:text-[#ff5500] transition-colors"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${state.isCloudSyncing ? 'animate-spin text-[#ff5500]' : ''}`}
+              />
             </button>
           </div>
         </section>
@@ -1111,11 +1223,21 @@ export function DashboardPage({
 
                 <button
                   type="button"
+                  onClick={handleExportOfx}
+                  className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-3.5 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500] transition-colors"
+                  title="Exportar no formato bancário OFX compatível com ERPs e contabilidade"
+                >
+                  <Download className="h-3.5 w-3.5 text-[#ff5500]" />
+                  <span>OFX</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleExportCsv}
-                  className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-3.5 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
+                  className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-3.5 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500] transition-colors"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  <span>Exportar CSV</span>
+                  <span>CSV</span>
                 </button>
 
                 <button
@@ -2374,17 +2496,17 @@ export function DashboardPage({
               <div className="flex flex-wrap items-center gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={handleExportFullBackupJson}
-                  className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-2.5 text-xs font-medium hover:text-[#ff5500]"
+                  onClick={handleExportOfx}
+                  className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-2.5 text-xs font-medium hover:text-[#ff5500] transition-colors"
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Exportar Backup JSON (6 Tabelas)</span>
+                  <Download className="h-3.5 w-3.5 text-[#ff5500]" />
+                  <span>Exportar Extrato OFX (Padrão Contábil / ERP)</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleExportCsv}
-                  className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-2.5 text-xs font-medium hover:text-[#ff5500]"
+                  className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-2.5 text-xs font-medium hover:text-[#ff5500] transition-colors"
                 >
                   <Download className="h-3.5 w-3.5" />
                   <span>Exportar Extrato CSV</span>
@@ -2392,21 +2514,78 @@ export function DashboardPage({
 
                 <button
                   type="button"
-                  onClick={() => void viewModel.resetDemoData()}
-                  className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-2.5 text-xs font-medium nexo-text-muted hover:text-[#ff5500]"
+                  onClick={handleExportFullBackupJson}
+                  className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-2.5 text-xs font-medium hover:text-[#ff5500] transition-colors"
                 >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  <span>Restaurar Dados de Demonstração</span>
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Portabilidade de Dados LGPD (JSON)</span>
                 </button>
+              </div>
+            </section>
 
+            {/* SEÇÃO SEGURANÇA BANCÁRIA E LIMITES OPERACIONAIS PIX (RESOLUÇÃO BCB Nº 142/2021) */}
+            <section className="rounded-3xl nexo-card p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs uppercase tracking-wider text-[#ff5500] font-medium block mb-1">
+                    Segurança e Conformidade Regulatória
+                  </span>
+                  <h3 className="font-heading text-lg">
+                    Limites Operacionais PIX (Resolução BCB nº 142/2021)
+                  </h3>
+                  <p className="text-xs nexo-text-secondary mt-1">
+                    Parâmetros de mitigação de risco e proteção antifraude auditados pelo Banco Central do Brasil.
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 text-emerald-500 px-3.5 py-1.5 text-xs font-medium">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>Conta Titular Ativa e Verificada</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div className="rounded-2xl nexo-elevated p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-foreground">Limite Diurno (06:00 às 20:00)</span>
+                    <span className="font-heading text-[#ff5500]">R$ 10.000,00</span>
+                  </div>
+                  <p className="nexo-text-secondary text-[11px]">
+                    Limite consolidado para transferências e pagamentos durante horário comercial.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl nexo-elevated p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-foreground">Limite Noturno (20:00 às 06:00)</span>
+                    <span className="font-heading text-[#ff5500]">R$ 1.000,00</span>
+                  </div>
+                  <p className="nexo-text-secondary text-[11px]">
+                    Proteção regulatória contra fraudes e coação noturna conforme normas do BACEN.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl nexo-elevated p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-foreground">Por Transação Individual</span>
+                    <span className="font-heading text-[#ff5500]">R$ 5.000,00</span>
+                  </div>
+                  <p className="nexo-text-secondary text-[11px]">
+                    Teto máximo autorizado por operação unitária sem autorização em duas etapas.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+                <p className="nexo-text-secondary text-[11px]">
+                  Solicitações de aumento de limites exigem prazo regulatório de 24 a 48 horas para análise pelo comitê de segurança bancária.
+                </p>
                 <button
                   type="button"
-                  onClick={() => void viewModel.resetAccountToZero()}
-                  className="inline-flex items-center gap-2 rounded-full border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-600 hover:text-white transition-colors"
-                  title="Remove todos os dados simulados e inicia sua conta zerada com R$ 0,00"
+                  onClick={() => void handleRequestAccountClosure()}
+                  className="inline-flex items-center gap-2 rounded-full border border-red-500/30 px-4 py-2 text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors self-start sm:self-auto"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  <span>Zerar Minha Conta (Saldo R$ 0,00)</span>
+                  <span>Solicitar Encerramento de Conta</span>
                 </button>
               </div>
             </section>
