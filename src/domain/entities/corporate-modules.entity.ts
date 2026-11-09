@@ -115,6 +115,30 @@ export class CreditCardAccount {
     return right(paidAmount);
   }
 
+  public addPurchase(amount: number): Either<Failure, number> {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return left(
+        new ValidationFailure(
+          'O valor da compra no cartão deve ser maior que zero.',
+          'amount',
+        ),
+      );
+    }
+    if (this._usedAmount + amount > this._totalLimit) {
+      return left(
+        new ValidationFailure(
+          `Limite insuficiente no cartão ${this.cardName} (Disponível: R$ ${this.availableLimit.toFixed(2)}).`,
+          'amount',
+        ),
+      );
+    }
+    this._usedAmount = Number((this._usedAmount + amount).toFixed(2));
+    if (this._invoiceStatus === 'PAID') {
+      this._invoiceStatus = 'OPEN';
+    }
+    return right(this._usedAmount);
+  }
+
   public adjustLimit(newTotalLimit: number): Either<Failure, CardLimitTuple> {
     if (!Number.isFinite(newTotalLimit) || newTotalLimit < this._usedAmount) {
       return left(
@@ -364,3 +388,4 @@ export class RegisteredPixKey {
     };
   }
 }
+

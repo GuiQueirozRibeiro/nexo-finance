@@ -33,6 +33,16 @@ export interface NexoAuthUser {
   readonly isAnonymous: boolean;
 }
 
+export interface FirestoreUserFinanceSnapshot {
+  readonly accounts: readonly unknown[];
+  readonly transactions: readonly unknown[];
+  readonly creditCards?: readonly unknown[];
+  readonly costCenters?: readonly unknown[];
+  readonly subscriptions?: readonly unknown[];
+  readonly pixKeys?: readonly unknown[];
+  readonly updatedAtIso?: string;
+}
+
 export type AuthStateListener = (user: NexoAuthUser | null) => void;
 
 const FIREBASE_CONFIG = {
@@ -225,15 +235,42 @@ export class FirebaseClientManager {
     FirebaseClientManager._notify();
   }
 
+  public static async updateUserDisplayName(
+    newDisplayName: string,
+  ): Promise<Either<Failure, NexoAuthUser>> {
+    try {
+      const { auth } = FirebaseClientManager._ensureInitialized();
+      if (!auth.currentUser) {
+        return left(
+          new NetworkFailure('Nenhum usuário autenticado no Firebase.'),
+        );
+      }
+      const trimmed = newDisplayName.trim();
+      await updateProfile(auth.currentUser, { displayName: trimmed });
+      const updated: NexoAuthUser = {
+        uid: auth.currentUser.uid,
+        email: auth.currentUser.email,
+        displayName: trimmed || 'Cliente Nexo',
+        isAnonymous: auth.currentUser.isAnonymous,
+      };
+      FirebaseClientManager._currentUser = updated;
+      FirebaseClientManager._notify();
+      return right(updated);
+    } catch {
+      return left(
+        new NetworkFailure('Não foi possível atualizar o perfil no Firebase.'),
+      );
+    }
+  }
+
   /**
-   * Salva o snapshot financeiro do usuário autenticado no Cloud Firestore (`users/{uid}/finance/snapshot`).
+   * Salva o snapshot completo (6 tabelas) do usuário autenticado no Cloud Firestore (`users/{uid}/finance/snapshot`).
    */
-  public static async saveUserSnapshotToFirestore(
-    accountsJson: readonly unknown[],
-    transactionsJson: readonly unknown[],
-  ): Promise<void> {
+  public static async saveFullSnapshotToFirestore(
+    snapshot: FirestoreUserFinanceSnapshot,
+  ): Promise<boolean> {
     if (typeof window === 'undefined' || !FirebaseClientManager._currentUser) {
-      return;
+      return false;
     }
     try {
       const { db } = FirebaseClientManager._ensureInitialized();
@@ -247,24 +284,34 @@ export class FirebaseClientManager {
       await setDoc(
         ref,
         {
-          accounts: accountsJson,
-          transactions: transactionsJson,
+          ...snapshot,
           updatedAtIso: new Date().toISOString(),
         },
         { merge: true },
       );
+      return true;
     } catch {
-      // Fallback silencioso para manter funcionamento offline-first via localStorage
+      return false;
     }
   }
 
   /**
-   * Carrega o snapshot financeiro do usuário no Cloud Firestore se existir.
+   * Compatibilidade com chamadas parciais de contas e transações.
    */
-  public static async loadUserSnapshotFromFirestore(): Promise<{
-    readonly accounts: readonly unknown[];
-    readonly transactions: readonly unknown[];
-  } | null> {
+  public static async saveUserSnapshotToFirestore(
+    accountsJson: readonly unknown[],
+    transactionsJson: readonly unknown[],
+  ): Promise<void> {
+    await FirebaseClientManager.saveFullSnapshotToFirestore({
+      accounts: accountsJson,
+      transactions: transactionsJson,
+    });
+  }
+
+  /**
+   * Carrega o snapshot financeiro completo do usuário no Cloud Firestore se existir.
+   */
+  public static async loadUserSnapshotFromFirestore(): Promise<FirestoreUserFinanceSnapshot | null> {
     if (typeof window === 'undefined' || !FirebaseClientManager._currentUser) {
       return null;
     }
@@ -290,6 +337,22 @@ export class FirebaseClientManager {
         return {
           accounts: data.accounts as readonly unknown[],
           transactions: data.transactions as readonly unknown[],
+          creditCards: Array.isArray(data.creditCards)
+            ? (data.creditCards as readonly unknown[])
+            : undefined,
+          costCenters: Array.isArray(data.costCenters)
+            ? (data.costCenters as readonly unknown[])
+            : undefined,
+          subscriptions: Array.isArray(data.subscriptions)
+            ? (data.subscriptions as readonly unknown[])
+            : undefined,
+          pixKeys: Array.isArray(data.pixKeys)
+            ? (data.pixKeys as readonly unknown[])
+            : undefined,
+          updatedAtIso:
+            typeof data.updatedAtIso === 'string'
+              ? data.updatedAtIso
+              : undefined,
         };
       }
       return null;

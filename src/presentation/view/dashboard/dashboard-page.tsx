@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -9,8 +9,11 @@ import {
   ArrowUpRight,
   Building2,
   Check,
+  Cloud,
   Copy,
   CreditCard,
+  Download,
+  ExternalLink,
   Eye,
   EyeOff,
   KeyRound,
@@ -22,8 +25,13 @@ import {
   RotateCcw,
   Search,
   Send,
+  Settings,
+  ShieldCheck,
+  ShoppingBag,
   SlidersHorizontal,
   Sparkles,
+  Trash2,
+  UserCheck,
   X,
 } from 'lucide-react';
 import {
@@ -36,31 +44,44 @@ import {
   getCategoryLabel,
   getInstitutionDisplayName,
 } from '@/core';
-import type { PixKeyType, TransactionType } from '@/domain';
+import type { CardBrand, PixKeyType, TransactionType } from '@/domain';
 import {
   type FinanceViewState,
   createFinanceViewModel,
 } from '@/presentation/viewmodel/finance.viewmodel';
 import { NexoNavbar } from '../components/nexo-navbar';
 
-type PortalTab =
+export type PortalTab =
   | 'overview'
   | 'statement'
   | 'accounts'
+  | 'account_detail'
   | 'cards'
   | 'costs'
-  | 'subscriptions_pix';
+  | 'subscriptions'
+  | 'pix'
+  | 'settings';
 
 type ActiveWizard =
   | null
   | 'transfer_pix'
   | 'charge_pix'
   | 'new_transaction'
+  | 'connect_bank'
   | 'open_finance'
+  | 'new_card'
+  | 'card_purchase'
   | 'card_manage'
+  | 'new_cost_center'
   | 'cost_budget'
+  | 'new_subscription'
   | 'new_pix_key'
   | 'assistant';
+
+export interface DashboardPageProps {
+  readonly initialTab?: PortalTab;
+  readonly selectedAccountIdParam?: string;
+}
 
 function formatCurrency(value: number, hidden = false): string {
   if (hidden) {
@@ -72,14 +93,18 @@ function formatCurrency(value: number, hidden = false): string {
   });
 }
 
-export function DashboardPage() {
+export function DashboardPage({
+  initialTab = 'overview',
+  selectedAccountIdParam,
+}: DashboardPageProps = {}) {
   const viewModel = useMemo(() => createFinanceViewModel(), []);
   const [state, setState] = useState<DeepReadonly<FinanceViewState>>(
     () => viewModel.state,
   );
   const [authUser, setAuthUser] = useState<NexoAuthUser | null>(null);
+  const syncedUidRef = useRef<string | null>(null);
   const [hideBalances, setHideBalances] = useState(false);
-  const [activeTab, setActiveTab] = useState<PortalTab>('overview');
+  const [activeTab, setActiveTab] = useState<PortalTab>(initialTab);
   const [activeCategory, setActiveCategory] = useState<
     TransactionCategory | 'ALL'
   >('ALL');
@@ -112,17 +137,68 @@ export function DashboardPage() {
     InstitutionCode.NUBANK,
   );
 
-  // Estado Wizard: Open Finance (2 passos)
-  const [selectedBankId, setSelectedBankId] = useState<string | null>(null);
+  // Estado Wizard: Conectar Novo Banco Open Finance (3 passos)
+  const [newBankInst, setNewBankInst] = useState<InstitutionCode>(
+    InstitutionCode.BRADESCO,
+  );
+  const [newBankNickname, setNewBankNickname] = useState(
+    'Bradesco Corporate PJ',
+  );
+  const [newBankCompe, setNewBankCompe] = useState('237');
+  const [newBankBranch, setNewBankBranch] = useState('2040');
+  const [newBankAccountNum, setNewBankAccountNum] = useState('1300984-2');
+  const [newBankInitialBalance, setNewBankInitialBalance] = useState('18500');
+
+  // Estado Wizard: Open Finance Gerenciar (2 passos)
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(
+    selectedAccountIdParam ?? null,
+  );
+
+  // Estado Wizard: Novo Cartão Corporativo (3 passos)
+  const [newCardInst, setNewCardInst] = useState<InstitutionCode>(
+    InstitutionCode.NUBANK,
+  );
+  const [newCardBrand, setNewCardBrand] =
+    useState<CardBrand>('MASTERCARD_BLACK');
+  const [newCardName, setNewCardName] = useState('Nubank Ultravioleta PJ');
+  const [newCardDigits, setNewCardDigits] = useState('7721');
+  const [newCardLimit, setNewCardLimit] = useState('35000');
+  const [newCardClosing, setNewCardClosing] = useState('5');
+  const [newCardDue, setNewCardDue] = useState('12');
+
+  // Estado Wizard: Compra no Cartão (2 passos)
+  const [purchaseCardId, setPurchaseCardId] = useState<string | null>(null);
+  const [purchaseTitle, setPurchaseTitle] = useState('');
+  const [purchaseAmount, setPurchaseAmount] = useState('');
+  const [purchaseCategory, setPurchaseCategory] = useState<TransactionCategory>(
+    TransactionCategory.SUBSCRIPTIONS,
+  );
 
   // Estado Wizard: Gerenciar Cartão / Fatura (2 passos)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [newCardLimitInput, setNewCardLimitInput] = useState('30000');
 
+  // Estado Wizard: Novo Centro de Custo (2 passos)
+  const [newCostName, setNewCostName] = useState('');
+  const [newCostArea, setNewCostArea] = useState('Operações & Produto');
+  const [newCostCat, setNewCostCat] = useState<TransactionCategory>(
+    TransactionCategory.TRANSPORT,
+  );
+  const [newCostIdeal, setNewCostIdeal] = useState('1000');
+  const [newCostCeiling, setNewCostCeiling] = useState('1500');
+
   // Estado Wizard: Editar Meta de Centro de Custo (2 passos)
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
   const [budgetIdealInput, setBudgetIdealInput] = useState('1200');
   const [budgetCeilingInput, setBudgetCeilingInput] = useState('1600');
+
+  // Estado Wizard: Nova Assinatura Recorrente (2 passos)
+  const [newSubName, setNewSubName] = useState('');
+  const [newSubInst, setNewSubInst] = useState<InstitutionCode>(
+    InstitutionCode.NUBANK,
+  );
+  const [newSubAmount, setNewSubAmount] = useState('89.90');
+  const [newSubDay, setNewSubDay] = useState('15');
 
   // Estado Wizard: Cadastrar Chave PIX (2 passos)
   const [newKeyType, setNewKeyType] = useState<PixKeyType>('EMAIL');
@@ -131,6 +207,10 @@ export function DashboardPage() {
   const [newKeyInst, setNewKeyInst] = useState<InstitutionCode>(
     InstitutionCode.ASAAS,
   );
+
+  // Estado Perfil / Configurações
+  const [profileNameInput, setProfileNameInput] = useState('');
+  const [profileStatusMsg, setProfileStatusMsg] = useState<string | null>(null);
 
   // Estado Assistente & Busca
   const [chatInput, setChatInput] = useState('');
@@ -141,6 +221,13 @@ export function DashboardPage() {
     void viewModel.loadDashboard();
     const unsubAuth = FirebaseClientManager.subscribe((user) => {
       setAuthUser(user);
+      if (user?.displayName) {
+        setProfileNameInput(user.displayName);
+      }
+      if (user && syncedUidRef.current !== user.uid) {
+        syncedUidRef.current = user.uid;
+        void viewModel.syncWithCloudFirestore();
+      }
     });
     return () => {
       unsubVm();
@@ -218,6 +305,73 @@ export function DashboardPage() {
     }
   };
 
+  const handleConnectNewBank = async () => {
+    const ok = await viewModel.connectNewBankAccount({
+      id: `acc-${newBankInst.toLowerCase()}-${Date.now()}`,
+      institution: newBankInst,
+      nickname: newBankNickname.trim() || getInstitutionDisplayName(newBankInst),
+      balance: Number(newBankInitialBalance) || 0,
+      coordinates: [
+        newBankCompe.trim() || '001',
+        newBankBranch.trim() || '0001',
+        newBankAccountNum.trim() || '00001-9',
+      ],
+      consentStatus: 'AUTHORIZED',
+      lastSyncIso: new Date().toISOString(),
+      colorAccentHex: '#ff5500',
+    });
+    if (ok) {
+      closeWizard();
+    }
+  };
+
+  const handleCreateNewCard = () => {
+    const ok = viewModel.addCreditCard({
+      id: `card-${Date.now()}`,
+      institution: newCardInst,
+      cardName: newCardName,
+      lastFourDigits: newCardDigits,
+      brand: newCardBrand,
+      limits: [0, Number(newCardLimit) || 10000],
+      closingDay: Number(newCardClosing) || 5,
+      dueDay: Number(newCardDue) || 12,
+      invoiceStatus: 'OPEN',
+    });
+    if (ok) {
+      closeWizard();
+    }
+  };
+
+  const handleCreateCardPurchase = async () => {
+    const targetId = purchaseCardId ?? state.creditCards[0]?.id;
+    if (!targetId) return;
+    const ok = await viewModel.addCardPurchase(
+      targetId,
+      purchaseTitle,
+      Number(purchaseAmount),
+      purchaseCategory,
+    );
+    if (ok) {
+      setPurchaseTitle('');
+      setPurchaseAmount('');
+      closeWizard();
+    }
+  };
+
+  const handleCreateCostCenter = () => {
+    const ok = viewModel.addCostCenter({
+      id: `cc-${Date.now()}`,
+      category: newCostCat,
+      costCenterName: newCostName,
+      responsibleArea: newCostArea,
+      thresholds: [Number(newCostIdeal), Number(newCostCeiling)],
+    });
+    if (ok) {
+      setNewCostName('');
+      closeWizard();
+    }
+  };
+
   const handleSaveCostBudget = () => {
     if (!selectedBudgetId) return;
     const ok = viewModel.updateCostCenterThresholds(
@@ -226,6 +380,22 @@ export function DashboardPage() {
       Number(budgetCeilingInput),
     );
     if (ok) {
+      closeWizard();
+    }
+  };
+
+  const handleCreateSubscription = () => {
+    const ok = viewModel.addSubscription({
+      id: `sub-${Date.now()}`,
+      serviceName: newSubName,
+      category: TransactionCategory.SUBSCRIPTIONS,
+      institution: newSubInst,
+      monthlyAmount: Number(newSubAmount),
+      billingDay: Number(newSubDay) || 10,
+      status: 'ACTIVE',
+    });
+    if (ok) {
+      setNewSubName('');
       closeWizard();
     }
   };
@@ -246,6 +416,55 @@ export function DashboardPage() {
     }
   };
 
+  const handleExportCsv = () => {
+    const csv = viewModel.exportTransactionsCsv();
+    if (typeof window !== 'undefined') {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nexo-extrato-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleExportFullBackupJson = () => {
+    if (typeof window === 'undefined') return;
+    const payload = {
+      exportedAtIso: new Date().toISOString(),
+      accounts: state.accounts,
+      transactions: state.transactions,
+      creditCards: state.creditCards.map((c) => c.toProps()),
+      costCenters: state.costCenters.map((c) => c.toProps()),
+      subscriptions: state.subscriptions.map((s) => s.toProps()),
+      pixKeys: state.pixKeys.map((p) => p.toProps()),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexo-backup-6-tabelas-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSaveProfileName = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!profileNameInput.trim()) return;
+    const result =
+      await FirebaseClientManager.updateUserDisplayName(profileNameInput);
+    if (result.isRight()) {
+      setProfileStatusMsg(
+        'Nome atualizado com sucesso no Firebase Auth e Cloud Firestore!',
+      );
+    } else {
+      setProfileStatusMsg(result.value.toSummary());
+    }
+  };
+
   const handleAskAssistant = (e: FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) {
@@ -256,7 +475,9 @@ export function DashboardPage() {
   };
 
   const selectedBank =
-    state.accounts.find((a) => a.id === selectedBankId) ?? state.accounts[0];
+    state.accounts.find(
+      (a) => a.id === (selectedAccountIdParam ?? selectedBankId),
+    ) ?? state.accounts[0];
   const selectedCard =
     state.creditCards.find((c) => c.id === selectedCardId) ??
     state.creditCards[0];
@@ -279,13 +500,28 @@ export function DashboardPage() {
   const portalTabs: readonly {
     readonly id: PortalTab;
     readonly label: string;
+    readonly href: string;
   }[] = [
-    { id: 'overview', label: 'Visão Geral' },
-    { id: 'statement', label: 'Extrato (Tabela)' },
-    { id: 'accounts', label: 'Contas Open Finance' },
-    { id: 'cards', label: 'Cartões & Faturas' },
-    { id: 'costs', label: 'Análise de Custos' },
-    { id: 'subscriptions_pix', label: 'Assinaturas & PIX' },
+    { id: 'overview', label: 'Visão Geral', href: '/portal' },
+    { id: 'statement', label: 'Extrato', href: '/portal/extrato' },
+    {
+      id: 'accounts',
+      label: 'Contas Open Finance',
+      href: '/portal/contas',
+    },
+    { id: 'cards', label: 'Cartões & Faturas', href: '/portal/cartoes' },
+    { id: 'costs', label: 'Centros de Custo', href: '/portal/custos' },
+    {
+      id: 'subscriptions',
+      label: 'Assinaturas',
+      href: '/portal/assinaturas',
+    },
+    { id: 'pix', label: 'Central PIX', href: '/portal/pix' },
+    {
+      id: 'settings',
+      label: 'Configurações & Chaves',
+      href: '/portal/configuracoes',
+    },
   ];
 
   return (
@@ -293,13 +529,20 @@ export function DashboardPage() {
       <NexoNavbar />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-8 sm:py-10 space-y-8">
-        {/* TOPO ESTILO NUBANK: Saudação + Controles discretos */}
+        {/* TOPO ESTILO NUBANK: Saudação + Status Cloud Firestore + Controles discretos */}
         <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <p className="text-xs nexo-text-muted mb-0.5">
+            <p className="text-xs nexo-text-muted mb-0.5 flex items-center gap-1.5">
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  authUser ? 'bg-[#ff5500]' : 'bg-zinc-500'
+                }`}
+              />
               {authUser
-                ? `Sincronizado no Firebase (${authUser.email ?? 'Sessão ativa'})`
-                : 'Sessão Local • Entre para sincronizar na nuvem'}
+                ? state.isCloudSyncing
+                  ? 'Sincronizando 6 tabelas com Cloud Firestore...'
+                  : `Salvo no Cloud Firestore (${authUser.email ?? 'Conta Conectada'})`
+                : 'Sessão Local • Entre no Firebase para salvar na nuvem'}
             </p>
             <h1 className="font-heading text-xl sm:text-2xl tracking-tight">
               Olá, {userName}
@@ -335,10 +578,18 @@ export function DashboardPage() {
               {state.activeFlavor === AppFlavor.DEV ? 'Sandbox' : 'Asaas Live'}
             </button>
 
+            <Link
+              href="/portal/configuracoes"
+              title="Configurações, Perfil Firebase e Tokens"
+              className="flex h-9 w-9 items-center justify-center rounded-full nexo-card nexo-text-secondary hover:text-[#ff5500] transition-colors"
+            >
+              <Settings className="h-4 w-4" />
+            </Link>
+
             <button
               type="button"
               onClick={() => void viewModel.resetDemoData()}
-              title="Restaurar dados iniciais"
+              title="Restaurar dados iniciais das 6 tabelas"
               className="flex h-9 w-9 items-center justify-center rounded-full nexo-card nexo-text-secondary hover:text-[#ff5500] transition-colors"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -346,14 +597,16 @@ export function DashboardPage() {
           </div>
         </section>
 
-        {/* NAVEGAÇÃO DE MÓDULOS DO PORTAL (Minimalista) */}
+        {/* NAVEGAÇÃO DE ROTAS DO PORTAL (Minimalista com URLs reais) */}
         <section className="flex items-center gap-2 overflow-x-auto pb-1">
           {portalTabs.map((tab) => {
-            const active = activeTab === tab.id;
+            const active =
+              activeTab === tab.id ||
+              (activeTab === 'account_detail' && tab.id === 'accounts');
             return (
-              <button
+              <Link
                 key={tab.id}
-                type="button"
+                href={tab.href}
                 onClick={() => setActiveTab(tab.id)}
                 className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium transition-all ${
                   active
@@ -362,7 +615,7 @@ export function DashboardPage() {
                 }`}
               >
                 {tab.label}
-              </button>
+              </Link>
             );
           })}
         </section>
@@ -384,7 +637,7 @@ export function DashboardPage() {
         )}
 
         {/* =================================================================
-            MÓDULO 1: VISÃO GERAL (Nubank Style + Wizards)
+            TELA 1: VISÃO GERAL EXECUTIVA (/portal)
            ================================================================= */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
@@ -392,7 +645,8 @@ export function DashboardPage() {
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
                 <div>
                   <span className="text-xs uppercase tracking-[0.18em] nexo-text-muted block mb-2">
-                    Saldo Consolidado Open Finance
+                    Saldo Consolidado Open Finance ({state.accounts.length}{' '}
+                    instituições)
                   </span>
                   <div className="font-heading text-3xl sm:text-4xl tracking-tight">
                     {summary
@@ -404,7 +658,7 @@ export function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-6 text-xs">
+                <div className="flex flex-wrap items-center gap-6 text-xs">
                   <div>
                     <span className="nexo-text-muted block mb-0.5">
                       Entradas no mês
@@ -485,14 +739,14 @@ export function DashboardPage() {
                     icon: Plus,
                   },
                   {
-                    id: 'open_finance' as const,
-                    label: 'Meus Bancos',
+                    id: 'connect_bank' as const,
+                    label: 'Conectar Banco',
                     icon: Building2,
                   },
                   {
-                    id: 'card_manage' as const,
-                    label: 'Pagar Fatura',
-                    icon: CreditCard,
+                    id: 'card_purchase' as const,
+                    label: 'Compra Cartão',
+                    icon: ShoppingBag,
                   },
                   {
                     id: 'assistant' as const,
@@ -520,12 +774,29 @@ export function DashboardPage() {
               </div>
             </section>
 
-            {/* RESUMO RÁPIDO DAS TABELAS CORPORATIVAS */}
+            {/* CARTÕES DE NAVEGAÇÃO PARA AS TELAS DEDICADAS */}
             <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button
-                type="button"
-                onClick={() => setActiveTab('cards')}
-                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors"
+              <Link
+                href="/portal/contas"
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors block"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs nexo-text-muted uppercase tracking-wider">
+                    Instituições Open Finance
+                  </span>
+                  <Building2 className="h-4 w-4 text-[#ff5500]" />
+                </div>
+                <p className="font-heading text-xl mb-1">
+                  {state.accounts.length} bancos conectados
+                </p>
+                <p className="text-xs nexo-text-secondary">
+                  Abrir tela de Contas & Coordenadas →
+                </p>
+              </Link>
+
+              <Link
+                href="/portal/cartoes"
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors block"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs nexo-text-muted uppercase tracking-wider">
@@ -540,15 +811,13 @@ export function DashboardPage() {
                   )}
                 </p>
                 <p className="text-xs nexo-text-secondary">
-                  {state.creditCards.length} cartões monitorados via Open
-                  Finance →
+                  {state.creditCards.length} cartões monitorados →
                 </p>
-              </button>
+              </Link>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('costs')}
-                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors"
+              <Link
+                href="/portal/custos"
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors block"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs nexo-text-muted uppercase tracking-wider">
@@ -560,45 +829,80 @@ export function DashboardPage() {
                   {state.costCenters.length} orçamentos ativos
                 </p>
                 <p className="text-xs nexo-text-secondary">
-                  Ver tabela de metas [Ideal vs Teto] →
+                  Abrir análise [Meta Ideal vs Teto] →
                 </p>
-              </button>
+              </Link>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('subscriptions_pix')}
-                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors"
+              <Link
+                href="/portal/extrato"
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors block"
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs nexo-text-muted uppercase tracking-wider">
-                    Assinaturas & Chaves PIX
+                    Extrato Consolidado
+                  </span>
+                  <ArrowUpRight className="h-4 w-4 text-[#ff5500]" />
+                </div>
+                <p className="font-heading text-xl mb-1">
+                  {state.transactions.length} lançamentos
+                </p>
+                <p className="text-xs nexo-text-secondary">
+                  Conciliação, filtros e exportação CSV →
+                </p>
+              </Link>
+
+              <Link
+                href="/portal/assinaturas"
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors block"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs nexo-text-muted uppercase tracking-wider">
+                    Radar de Assinaturas
                   </span>
                   <Repeat className="h-4 w-4 text-[#ff5500]" />
                 </div>
                 <p className="font-heading text-xl mb-1">
-                  {state.subscriptions.length} contratos •{' '}
-                  {state.pixKeys.length} chaves
+                  {state.subscriptions.length} contratos recorrentes
                 </p>
                 <p className="text-xs text-[#ff5500]">
-                  1 alerta de assinatura duplicada →
+                  Auditar cobranças e duplicidades →
                 </p>
-              </button>
+              </Link>
+
+              <Link
+                href="/portal/pix"
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors block"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs nexo-text-muted uppercase tracking-wider">
+                    Central PIX Asaas
+                  </span>
+                  <KeyRound className="h-4 w-4 text-[#ff5500]" />
+                </div>
+                <p className="font-heading text-xl mb-1">
+                  {state.pixKeys.length} chaves registradas
+                </p>
+                <p className="text-xs nexo-text-secondary">
+                  Transferências, QR Code EMV e chaves →
+                </p>
+              </Link>
             </section>
           </div>
         )}
 
         {/* =================================================================
-            MÓDULO 2: TABELA DE EXTRATO & CONCILIAÇÃO MULTI-BANCO
+            TELA 2: TABELA DE EXTRATO & CONCILIAÇÃO MULTI-BANCO (/portal/extrato)
            ================================================================= */}
         {activeTab === 'statement' && (
           <section className="rounded-3xl nexo-card p-6 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-heading text-base">
-                  Tabela de Lançamentos e Conciliação
+                  Tabela de Lançamentos e Conciliação Multi-Banco
                 </h2>
                 <p className="text-xs nexo-text-muted">
-                  Livro-razão consolidado entre todas as contas conectadas.
+                  Livro-razão sincronizado em tempo real com localStorage e
+                  Cloud Firestore.
                 </p>
               </div>
 
@@ -620,6 +924,15 @@ export function DashboardPage() {
                     className="rounded-full nexo-elevated pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-[#ff5500]"
                   />
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-3.5 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Exportar CSV</span>
+                </button>
 
                 <button
                   type="button"
@@ -682,8 +995,8 @@ export function DashboardPage() {
                     <th className="py-3 px-3">Descrição / Favorecido</th>
                     <th className="py-3 px-3">Instituição</th>
                     <th className="py-3 px-3">Categoria</th>
-                    <th className="py-3 px-3">Status</th>
                     <th className="py-3 px-3 text-right">Valor</th>
+                    <th className="py-3 px-3 text-right">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -704,12 +1017,6 @@ export function DashboardPage() {
                           {tx.categoryLabel}
                         </span>
                       </td>
-                      <td className="py-3.5 px-3">
-                        <span className="inline-flex items-center gap-1 text-[11px] nexo-text-secondary">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#ff5500]" />
-                          Conciliado
-                        </span>
-                      </td>
                       <td
                         className={`py-3.5 px-3 text-right font-heading text-xs ${
                           tx.isIncome ? 'text-[#ff5500]' : ''
@@ -717,6 +1024,18 @@ export function DashboardPage() {
                       >
                         {tx.isIncome ? '+' : '-'}
                         {formatCurrency(tx.amount, hideBalances)}
+                      </td>
+                      <td className="py-3.5 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void viewModel.deleteTransaction(tx.id)
+                          }
+                          title="Excluir lançamento"
+                          className="inline-flex items-center justify-center h-7 w-7 rounded-full nexo-elevated nexo-text-muted hover:text-[#ff5500]"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -727,7 +1046,7 @@ export function DashboardPage() {
         )}
 
         {/* =================================================================
-            MÓDULO 3: TABELA DE CONTAS & CONSENTIMENTOS OPEN FINANCE
+            TELA 3: TABELA DE CONTAS OPEN FINANCE (/portal/contas)
            ================================================================= */}
         {activeTab === 'accounts' && (
           <section className="rounded-3xl nexo-card p-6 space-y-5">
@@ -741,14 +1060,24 @@ export function DashboardPage() {
                   <code>[codigoCompe, agencia, conta]</code>.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => openWizard('open_finance')}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                <span>Sincronizar Instituição</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openWizard('connect_bank')}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Conectar Novo Banco</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openWizard('open_finance')}
+                  className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-4 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Sincronizar</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -767,7 +1096,13 @@ export function DashboardPage() {
                   {state.accounts.map((acc) => (
                     <tr key={acc.id} className="hover:bg-white/[0.02]">
                       <td className="py-4 px-3 font-medium text-sm">
-                        {acc.nickname}
+                        <Link
+                          href={`/portal/contas/${acc.id}`}
+                          className="hover:text-[#ff5500] inline-flex items-center gap-1.5"
+                        >
+                          <span>{acc.nickname}</span>
+                          <ExternalLink className="h-3 w-3 nexo-text-muted" />
+                        </Link>
                       </td>
                       <td className="py-4 px-3 nexo-text-secondary">
                         {getInstitutionDisplayName(acc.institution)}
@@ -790,17 +1125,25 @@ export function DashboardPage() {
                         {formatCurrency(acc.balance, hideBalances)}
                       </td>
                       <td className="py-4 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedBankId(acc.id);
-                            openWizard('open_finance');
-                            setWizardStep(2);
-                          }}
-                          className="rounded-full nexo-elevated px-3 py-1.5 text-xs hover:text-[#ff5500]"
-                        >
-                          Gerenciar
-                        </button>
+                        <div className="inline-flex items-center gap-1.5">
+                          <Link
+                            href={`/portal/contas/${acc.id}`}
+                            className="rounded-full nexo-elevated px-3 py-1.5 text-xs hover:text-[#ff5500]"
+                          >
+                            Ver Conta
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedBankId(acc.id);
+                              openWizard('open_finance');
+                              setWizardStep(2);
+                            }}
+                            className="rounded-full nexo-elevated px-3 py-1.5 text-xs hover:text-[#ff5500]"
+                          >
+                            Sincronizar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -811,14 +1154,146 @@ export function DashboardPage() {
         )}
 
         {/* =================================================================
-            MÓDULO 4: TABELA DE CARTÕES DE CRÉDITO & FATURAS
+            TELA 4: DETALHE INDIVIDUAL DA CONTA BANCÁRIA (/portal/contas/[id])
+           ================================================================= */}
+        {activeTab === 'account_detail' && selectedBank && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <Link
+                href="/portal/contas"
+                className="inline-flex items-center gap-1.5 text-xs nexo-text-secondary hover:text-[#ff5500]"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Voltar para Contas Open Finance</span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => void viewModel.deleteBankAccount(selectedBank.id)}
+                className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-3.5 py-1.5 text-xs nexo-text-muted hover:text-[#ff5500]"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Desconectar instituição</span>
+              </button>
+            </div>
+
+            <section className="rounded-3xl nexo-card p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs uppercase tracking-wider text-[#ff5500] font-medium block mb-1">
+                    {getInstitutionDisplayName(selectedBank.institution)}
+                  </span>
+                  <h2 className="font-heading text-2xl">
+                    {selectedBank.nickname}
+                  </h2>
+                  <p className="text-xs font-mono nexo-text-secondary mt-1">
+                    {selectedBank.formattedCoordinates}
+                  </p>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <span className="text-xs nexo-text-muted block mb-1">
+                    Saldo Sincronizado
+                  </span>
+                  <p className="font-heading text-3xl">
+                    {formatCurrency(selectedBank.balance, hideBalances)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[var(--border-subtle)]">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void viewModel.syncInstitution(selectedBank.institution)
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Sincronizar via Open Finance (/api/open-finance/sync)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void viewModel.toggleAccountConsent(
+                      selectedBank.id,
+                      !selectedBank.isAuthorized,
+                    )
+                  }
+                  className="rounded-full nexo-elevated px-4 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
+                >
+                  {selectedBank.isAuthorized
+                    ? 'Revogar Consentimento'
+                    : 'Autorizar Consentimento'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTxInstitution(selectedBank.institution);
+                    openWizard('new_transaction');
+                  }}
+                  className="rounded-full nexo-elevated px-4 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
+                >
+                  + Lançamento nesta Conta
+                </button>
+              </div>
+            </section>
+
+            {/* Extrato exclusivo da instituição selecionada */}
+            <section className="rounded-3xl nexo-card p-6 space-y-4">
+              <h3 className="font-heading text-sm">
+                Movimentações exclusivas de {selectedBank.nickname}
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--border-subtle)] nexo-text-muted uppercase tracking-wider text-[11px]">
+                      <th className="py-3 px-3">Data</th>
+                      <th className="py-3 px-3">Descrição</th>
+                      <th className="py-3 px-3">Categoria</th>
+                      <th className="py-3 px-3 text-right">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
+                    {state.transactions
+                      .filter(
+                        (tx) => tx.institution === selectedBank.institution,
+                      )
+                      .map((tx) => (
+                        <tr key={tx.id}>
+                          <td className="py-3 px-3 font-mono nexo-text-secondary">
+                            {tx.dateIso}
+                          </td>
+                          <td className="py-3 px-3 font-medium">{tx.title}</td>
+                          <td className="py-3 px-3">{tx.categoryLabel}</td>
+                          <td
+                            className={`py-3 px-3 text-right font-heading ${
+                              tx.isIncome ? 'text-[#ff5500]' : ''
+                            }`}
+                          >
+                            {tx.isIncome ? '+' : '-'}
+                            {formatCurrency(tx.amount, hideBalances)}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* =================================================================
+            TELA 5: TABELA DE CARTÕES DE CRÉDITO & FATURAS (/portal/cartoes)
            ================================================================= */}
         {activeTab === 'cards' && (
           <section className="rounded-3xl nexo-card p-6 space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-heading text-base">
-                  Tabela de Cartões de Crédito & Limites
+                  Tabela de Cartões de Crédito & Faturas Open Finance
                 </h2>
                 <p className="text-xs nexo-text-muted">
                   Limites modelados como tupla{' '}
@@ -826,14 +1301,32 @@ export function DashboardPage() {
                   .
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => openWizard('card_manage')}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
-              >
-                <CreditCard className="h-3.5 w-3.5" />
-                <span>Pagar Fatura / Ajustar Limite</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openWizard('new_card')}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Novo Cartão</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openWizard('card_purchase')}
+                  className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-4 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
+                >
+                  <ShoppingBag className="h-3.5 w-3.5" />
+                  <span>Lançar Compra</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openWizard('card_manage')}
+                  className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-4 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
+                >
+                  <CreditCard className="h-3.5 w-3.5" />
+                  <span>Pagar Fatura / Limite</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -885,18 +1378,28 @@ export function DashboardPage() {
                         {formatCurrency(card.totalLimit, hideBalances)}
                       </td>
                       <td className="py-4 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedCardId(card.id);
-                            setNewCardLimitInput(String(card.totalLimit));
-                            openWizard('card_manage');
-                            setWizardStep(2);
-                          }}
-                          className="rounded-full nexo-elevated px-3 py-1.5 text-xs hover:text-[#ff5500]"
-                        >
-                          Opções
-                        </button>
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCardId(card.id);
+                              setNewCardLimitInput(String(card.totalLimit));
+                              openWizard('card_manage');
+                              setWizardStep(2);
+                            }}
+                            className="rounded-full nexo-elevated px-3 py-1.5 text-xs hover:text-[#ff5500]"
+                          >
+                            Opções
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => viewModel.deleteCreditCard(card.id)}
+                            title="Remover cartão"
+                            className="inline-flex items-center justify-center h-7 w-7 rounded-full nexo-elevated nexo-text-muted hover:text-[#ff5500]"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -907,7 +1410,7 @@ export function DashboardPage() {
         )}
 
         {/* =================================================================
-            MÓDULO 5: TABELA DE ANÁLISE DE CUSTOS & CENTROS DE CUSTO
+            TELA 6: TABELA DE CENTROS DE CUSTO & METAS (/portal/custos)
            ================================================================= */}
         {activeTab === 'costs' && (
           <section className="rounded-3xl nexo-card p-6 space-y-5">
@@ -921,14 +1424,24 @@ export function DashboardPage() {
                   <code>BudgetThresholdTuple = [metaIdeal, tetoAlerta]</code>.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => openWizard('cost_budget')}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                <span>Ajustar Metas (Wizard)</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openWizard('new_cost_center')}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Novo Centro de Custo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openWizard('cost_budget')}
+                  className="inline-flex items-center gap-1.5 rounded-full nexo-elevated px-4 py-2 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  <span>Ajustar Metas</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -941,7 +1454,7 @@ export function DashboardPage() {
                     <th className="py-3 px-3 text-right">Teto Alerta</th>
                     <th className="py-3 px-3 text-right">Realizado Mês</th>
                     <th className="py-3 px-3">Diagnóstico</th>
-                    <th className="py-3 px-3 text-right">Ação</th>
+                    <th className="py-3 px-3 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -985,19 +1498,31 @@ export function DashboardPage() {
                           </span>
                         </td>
                         <td className="py-4 px-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedBudgetId(cc.id);
-                              setBudgetIdealInput(String(cc.idealLimit));
-                              setBudgetCeilingInput(String(cc.maxAlertCeiling));
-                              openWizard('cost_budget');
-                              setWizardStep(2);
-                            }}
-                            className="rounded-full nexo-elevated px-3 py-1.5 text-xs hover:text-[#ff5500]"
-                          >
-                            Editar Meta
-                          </button>
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedBudgetId(cc.id);
+                                setBudgetIdealInput(String(cc.idealLimit));
+                                setBudgetCeilingInput(
+                                  String(cc.maxAlertCeiling),
+                                );
+                                openWizard('cost_budget');
+                                setWizardStep(2);
+                              }}
+                              className="rounded-full nexo-elevated px-3 py-1.5 text-xs hover:text-[#ff5500]"
+                            >
+                              Editar Meta
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => viewModel.deleteCostCenter(cc.id)}
+                              title="Excluir centro de custo"
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-full nexo-elevated nexo-text-muted hover:text-[#ff5500]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1009,71 +1534,78 @@ export function DashboardPage() {
         )}
 
         {/* =================================================================
-            MÓDULO 6: TABELAS DE ASSINATURAS RECORRENTES & CHAVES PIX
+            TELA 7: RADAR DE ASSINATURAS RECORRENTES (/portal/assinaturas)
            ================================================================= */}
-        {activeTab === 'subscriptions_pix' && (
-          <div className="space-y-8">
-            {/* TABELA 5: RADAR DE ASSINATURAS */}
-            <section className="rounded-3xl nexo-card p-6 space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h2 className="font-heading text-base">
-                    Tabela de Assinaturas & Contratos Recorrentes
-                  </h2>
-                  <p className="text-xs nexo-text-muted">
-                    Auditoria automática de cobranças mensais e impacto anual
-                    projetado (12 meses).
-                  </p>
-                </div>
+        {activeTab === 'subscriptions' && (
+          <section className="rounded-3xl nexo-card p-6 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-heading text-base">
+                  Tabela de Assinaturas & Contratos Recorrentes
+                </h2>
+                <p className="text-xs nexo-text-muted">
+                  Auditoria automática de cobranças mensais e impacto anual
+                  projetado (12 meses).
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => openWizard('new_subscription')}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Nova Assinatura</span>
+              </button>
+            </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-[var(--border-subtle)] nexo-text-muted uppercase tracking-wider text-[11px]">
-                      <th className="py-3 px-3">Serviço / Contrato</th>
-                      <th className="py-3 px-3">Instituição</th>
-                      <th className="py-3 px-3">Cobrança</th>
-                      <th className="py-3 px-3 text-right">Valor Mensal</th>
-                      <th className="py-3 px-3 text-right">Projeção Anual</th>
-                      <th className="py-3 px-3">Status Auditoria</th>
-                      <th className="py-3 px-3 text-right">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border-subtle)]">
-                    {state.subscriptions.map((sub) => (
-                      <tr key={sub.id} className="hover:bg-white/[0.02]">
-                        <td className="py-4 px-3 font-medium text-sm">
-                          {sub.serviceName}
-                        </td>
-                        <td className="py-4 px-3 nexo-text-secondary">
-                          {getInstitutionDisplayName(sub.institution)}
-                        </td>
-                        <td className="py-4 px-3 nexo-text-secondary">
-                          Todo dia {sub.billingDay}
-                        </td>
-                        <td className="py-4 px-3 text-right font-heading text-xs">
-                          {formatCurrency(sub.monthlyAmount, hideBalances)}
-                        </td>
-                        <td className="py-4 px-3 text-right font-mono nexo-text-secondary">
-                          {formatCurrency(sub.annualProjection, hideBalances)}
-                        </td>
-                        <td className="py-4 px-3">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                              sub.status === 'DUPLICATE_ALERT'
-                                ? 'bg-[#ff5500] text-white'
-                                : 'nexo-elevated'
-                            }`}
-                          >
-                            {sub.status === 'DUPLICATE_ALERT'
-                              ? 'Duplicidade Detectada'
-                              : sub.status === 'PAUSED'
-                                ? 'Pausada / Cancelada'
-                                : 'Ativa'}
-                          </span>
-                        </td>
-                        <td className="py-4 px-3 text-right">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--border-subtle)] nexo-text-muted uppercase tracking-wider text-[11px]">
+                    <th className="py-3 px-3">Serviço / Contrato</th>
+                    <th className="py-3 px-3">Instituição</th>
+                    <th className="py-3 px-3">Cobrança</th>
+                    <th className="py-3 px-3 text-right">Valor Mensal</th>
+                    <th className="py-3 px-3 text-right">Projeção Anual</th>
+                    <th className="py-3 px-3">Status Auditoria</th>
+                    <th className="py-3 px-3 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {state.subscriptions.map((sub) => (
+                    <tr key={sub.id} className="hover:bg-white/[0.02]">
+                      <td className="py-4 px-3 font-medium text-sm">
+                        {sub.serviceName}
+                      </td>
+                      <td className="py-4 px-3 nexo-text-secondary">
+                        {getInstitutionDisplayName(sub.institution)}
+                      </td>
+                      <td className="py-4 px-3 nexo-text-secondary">
+                        Todo dia {sub.billingDay}
+                      </td>
+                      <td className="py-4 px-3 text-right font-heading text-xs">
+                        {formatCurrency(sub.monthlyAmount, hideBalances)}
+                      </td>
+                      <td className="py-4 px-3 text-right font-mono nexo-text-secondary">
+                        {formatCurrency(sub.annualProjection, hideBalances)}
+                      </td>
+                      <td className="py-4 px-3">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                            sub.status === 'DUPLICATE_ALERT'
+                              ? 'bg-[#ff5500] text-white'
+                              : 'nexo-elevated'
+                          }`}
+                        >
+                          {sub.status === 'DUPLICATE_ALERT'
+                            ? 'Duplicidade Detectada'
+                            : sub.status === 'PAUSED'
+                              ? 'Pausada / Cancelada'
+                              : 'Ativa'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-3 text-right">
+                        <div className="inline-flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() =>
@@ -1087,13 +1619,91 @@ export function DashboardPage() {
                                 ? 'Reativar'
                                 : 'Pausar'}
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          <button
+                            type="button"
+                            onClick={() => viewModel.deleteSubscription(sub.id)}
+                            title="Remover assinatura"
+                            className="inline-flex items-center justify-center h-7 w-7 rounded-full nexo-elevated nexo-text-muted hover:text-[#ff5500]"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* =================================================================
+            TELA 8: CENTRAL PIX ASAAS & CHAVES REGISTRADAS (/portal/pix)
+           ================================================================= */}
+        {activeTab === 'pix' && (
+          <div className="space-y-8">
+            <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <button
+                type="button"
+                onClick={() => openWizard('transfer_pix')}
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500] transition-colors"
+              >
+                <Send className="h-5 w-5 text-[#ff5500] mb-3" />
+                <h3 className="font-heading text-base mb-1">
+                  Enviar Transferência PIX
+                </h3>
+                <p className="text-xs nexo-text-secondary">
+                  Fluxo guiado em 3 passos com validação de chave e comprovante
+                  EndToEndId.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openWizard('charge_pix')}
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500] transition-colors"
+              >
+                <QrCode className="h-5 w-5 text-[#ff5500] mb-3" />
+                <h3 className="font-heading text-base mb-1">
+                  Cobrar via QR Code EMV
+                </h3>
+                <p className="text-xs nexo-text-secondary">
+                  Gere código Copia e Cola BR Code pelo gateway Asaas BaaS.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openWizard('new_pix_key')}
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500] transition-colors"
+              >
+                <KeyRound className="h-5 w-5 text-[#ff5500] mb-3" />
+                <h3 className="font-heading text-base mb-1">
+                  Cadastrar Nova Chave PIX
+                </h3>
+                <p className="text-xs nexo-text-secondary">
+                  Registre chaves CPF, CNPJ, E-mail, Celular ou EVP Aleatória.
+                </p>
+              </button>
             </section>
+
+            {state.lastPixReceipt && (
+              <section className="rounded-3xl nexo-card border-[#ff5500]/40 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+                <div>
+                  <span className="text-[#ff5500] font-semibold uppercase tracking-wider block mb-1">
+                    Último Comprovante PIX Emitido
+                  </span>
+                  <p className="text-sm font-medium">
+                    {formatCurrency(state.lastPixReceipt.amount)} para{' '}
+                    {state.lastPixReceipt.recipientName} (
+                    {state.lastPixReceipt.pixKey})
+                  </p>
+                  <p className="font-mono nexo-text-muted mt-0.5">
+                    EndToEndId: {state.lastPixReceipt.endToEndId}
+                  </p>
+                </div>
+              </section>
+            )}
 
             {/* TABELA 6: CHAVES PIX REGISTRADAS */}
             <section className="rounded-3xl nexo-card p-6 space-y-5">
@@ -1112,7 +1722,7 @@ export function DashboardPage() {
                   onClick={() => openWizard('new_pix_key')}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
                 >
-                  <KeyRound className="h-3.5 w-3.5" />
+                  <Plus className="h-3.5 w-3.5" />
                   <span>Cadastrar Chave PIX</span>
                 </button>
               </div>
@@ -1125,7 +1735,7 @@ export function DashboardPage() {
                       <th className="py-3 px-3">Tipo</th>
                       <th className="py-3 px-3">Chave Validada</th>
                       <th className="py-3 px-3">Conta Vinculada</th>
-                      <th className="py-3 px-3 text-right">Status</th>
+                      <th className="py-3 px-3 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -1146,18 +1756,221 @@ export function DashboardPage() {
                           {getInstitutionDisplayName(pk.institution)}
                         </td>
                         <td className="py-3.5 px-3 text-right">
-                          {pk.isPrimary ? (
-                            <span className="text-[#ff5500] font-medium">
-                              Principal
-                            </span>
-                          ) : (
-                            <span className="nexo-text-muted">Ativa</span>
-                          )}
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleCopyQrPayload(pk.keyValue)
+                              }
+                              className="rounded-full nexo-elevated px-3 py-1 text-[11px] hover:text-[#ff5500]"
+                            >
+                              Copiar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => viewModel.deletePixKey(pk.id)}
+                              title="Excluir chave PIX"
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-full nexo-elevated nexo-text-muted hover:text-[#ff5500]"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* =================================================================
+            TELA 9: CONFIGURAÇÕES, PERFIL FIREBASE & INTEGRAÇÕES (/portal/configuracoes)
+           ================================================================= */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <section className="rounded-3xl nexo-card p-6 sm:p-8 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs uppercase tracking-wider text-[#ff5500] font-medium block mb-1">
+                    Autenticação & Persistência Cloud
+                  </span>
+                  <h2 className="font-heading text-xl">
+                    Perfil Firebase & Cloud Firestore
+                  </h2>
+                  <p className="text-xs nexo-text-secondary mt-1">
+                    Projeto ativo: <code>nexo-eximiatech</code> (região{' '}
+                    <code>southamerica-east1</code> — São Paulo).
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void viewModel.syncWithCloudFirestore()}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#ff5500] px-4 py-2.5 text-xs font-medium text-white"
+                >
+                  <Cloud className="h-4 w-4" />
+                  <span>Sincronizar 6 Tabelas com Firestore</span>
+                </button>
+              </div>
+
+              {authUser ? (
+                <form
+                  onSubmit={(e) => void handleSaveProfileName(e)}
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-[var(--border-subtle)]"
+                >
+                  <div>
+                    <label className="block text-xs nexo-text-muted mb-1">
+                      UID do Usuário (Firebase Auth)
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={authUser.uid}
+                      className="w-full rounded-2xl nexo-elevated px-4 py-2.5 text-xs font-mono nexo-text-secondary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs nexo-text-muted mb-1">
+                      E-mail Autenticado
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={authUser.email ?? 'Sessão Anônima Demo'}
+                      className="w-full rounded-2xl nexo-elevated px-4 py-2.5 text-xs nexo-text-secondary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs nexo-text-muted mb-1">
+                      Nome de Exibição (Salvo no Firebase)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={profileNameInput}
+                        onChange={(e) => setProfileNameInput(e.target.value)}
+                        placeholder="Seu nome"
+                        className="flex-1 rounded-2xl nexo-elevated px-4 py-2.5 text-xs focus:outline-none focus:border-[#ff5500]"
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-2xl bg-[#ff5500] px-4 py-2.5 text-xs font-medium text-white"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <div className="rounded-2xl nexo-elevated p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-xs">
+                    <UserCheck className="h-4 w-4 text-[#ff5500]" />
+                    <span>
+                      Você está usando o armazenamento local. Entre com sua
+                      conta para sincronizar no Cloud Firestore.
+                    </span>
+                  </div>
+                  <Link
+                    href="/login"
+                    className="rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
+                  >
+                    Fazer Login
+                  </Link>
+                </div>
+              )}
+
+              {profileStatusMsg && (
+                <p className="text-xs text-[#ff5500] font-medium">
+                  {profileStatusMsg}
+                </p>
+              )}
+            </section>
+
+            {/* DIAGNÓSTICO DE INTEGRAÇÕES & CHAVES DE AMBIENTE (VERCEL) */}
+            <section className="rounded-3xl nexo-card p-6 sm:p-8 space-y-5">
+              <div>
+                <h3 className="font-heading text-base">
+                  Status dos Gateways & Variáveis de Ambiente (Vercel)
+                </h3>
+                <p className="text-xs nexo-text-muted">
+                  Diagnóstico das integrações BaaS, Open Finance e banco em
+                  nuvem.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="rounded-2xl nexo-elevated p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading text-xs">
+                      Firebase Auth & Firestore
+                    </span>
+                    <ShieldCheck className="h-4 w-4 text-[#ff5500]" />
+                  </div>
+                  <p className="nexo-text-secondary">
+                    Projeto <code>nexo-eximiatech</code> conectado e ativo.
+                    Documento: <code>users/&#123;uid&#125;/finance/snapshot</code>
+                    .
+                  </p>
+                </div>
+
+                <div className="rounded-2xl nexo-elevated p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading text-xs">
+                      Asaas PIX BaaS (/api/asaas/pix)
+                    </span>
+                    <KeyRound className="h-4 w-4 text-[#ff5500]" />
+                  </div>
+                  <p className="nexo-text-secondary">
+                    Variável na Vercel: <code>ASAAS_API_KEY</code> e{' '}
+                    <code>ASAAS_BASE_URL</code>. Opera com fallback automático
+                    caso não configurada.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl nexo-elevated p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-heading text-xs">
+                      Open Finance (/api/open-finance/sync)
+                    </span>
+                    <Building2 className="h-4 w-4 text-[#ff5500]" />
+                  </div>
+                  <p className="nexo-text-secondary">
+                    Variáveis opcionais na Vercel:{' '}
+                    <code>PLUGGY_CLIENT_ID</code> e{' '}
+                    <code>PLUGGY_CLIENT_SECRET</code>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleExportFullBackupJson}
+                  className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-2.5 text-xs font-medium hover:text-[#ff5500]"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Exportar Backup JSON (6 Tabelas)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-2.5 text-xs font-medium hover:text-[#ff5500]"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Exportar Extrato CSV</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void viewModel.resetDemoData()}
+                  className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-2.5 text-xs font-medium nexo-text-muted hover:text-[#ff5500]"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Restaurar Dados de Demonstração</span>
+                </button>
               </div>
             </section>
           </div>
@@ -1177,7 +1990,7 @@ export function DashboardPage() {
       </main>
 
       {/* =====================================================================
-          MODAL WIZARD PASSO A PASSO ESTILO NUBANK
+          MODAL WIZARD PASSO A PASSO ESTILO NUBANK (TODOS OS MÓDULOS)
          ===================================================================== */}
       {activeWizard && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4">
@@ -1646,7 +2459,145 @@ export function DashboardPage() {
               </div>
             )}
 
-            {/* WIZARD 4: OPEN FINANCE (2 PASSOS) */}
+            {/* WIZARD 4: CONECTAR NOVO BANCO OPEN FINANCE (3 PASSOS) */}
+            {activeWizard === 'connect_bank' && (
+              <div className="space-y-5">
+                <div className="flex gap-1.5">
+                  {[1, 2, 3].map((s) => (
+                    <span
+                      key={s}
+                      className={`h-1 flex-1 rounded-full ${
+                        wizardStep >= s
+                          ? 'bg-[#ff5500]'
+                          : 'bg-[var(--border-subtle)]'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {wizardStep === 1 && (
+                  <div className="space-y-4">
+                    <h3 className="font-heading text-xl">
+                      Escolha a instituição Open Finance
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {Object.values(InstitutionCode).map((inst) => (
+                        <button
+                          key={inst}
+                          type="button"
+                          onClick={() => {
+                            setNewBankInst(inst);
+                            setNewBankNickname(
+                              `${getInstitutionDisplayName(inst)} Corporativo`,
+                            );
+                            setWizardStep(2);
+                          }}
+                          className="rounded-2xl nexo-elevated p-4 text-left hover:border-[#ff5500]"
+                        >
+                          <span className="font-heading text-xs block mb-1 text-[#ff5500]">
+                            {inst}
+                          </span>
+                          <span className="text-xs nexo-text-secondary">
+                            {getInstitutionDisplayName(inst)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-4">
+                    <h3 className="font-heading text-xl">
+                      Coordenadas da Conta (Tupla)
+                    </h3>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        Apelido da Conta
+                      </label>
+                      <input
+                        type="text"
+                        value={newBankNickname}
+                        onChange={(e) => setNewBankNickname(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-xs nexo-text-muted mb-1">
+                          COMPE
+                        </label>
+                        <input
+                          type="text"
+                          value={newBankCompe}
+                          onChange={(e) => setNewBankCompe(e.target.value)}
+                          className="w-full rounded-2xl nexo-elevated px-3 py-2.5 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs nexo-text-muted mb-1">
+                          Agência
+                        </label>
+                        <input
+                          type="text"
+                          value={newBankBranch}
+                          onChange={(e) => setNewBankBranch(e.target.value)}
+                          className="w-full rounded-2xl nexo-elevated px-3 py-2.5 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs nexo-text-muted mb-1">
+                          Conta
+                        </label>
+                        <input
+                          type="text"
+                          value={newBankAccountNum}
+                          onChange={(e) => setNewBankAccountNum(e.target.value)}
+                          className="w-full rounded-2xl nexo-elevated px-3 py-2.5 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(3)}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                    >
+                      Continuar
+                    </button>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-4">
+                    <h3 className="font-heading text-xl">
+                      Saldo Inicial e Consentimento
+                    </h3>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        Saldo Inicial Sincronizado (R$)
+                      </label>
+                      <input
+                        type="number"
+                        value={newBankInitialBalance}
+                        onChange={(e) =>
+                          setNewBankInitialBalance(e.target.value)
+                        }
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3.5 font-heading text-xl"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleConnectNewBank()}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                    >
+                      Autorizar Open Finance e Salvar Conta
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WIZARD 5: OPEN FINANCE SINCRONIZAR (2 PASSOS) */}
             {activeWizard === 'open_finance' && (
               <div className="space-y-5">
                 {wizardStep === 1 ? (
@@ -1743,7 +2694,247 @@ export function DashboardPage() {
               </div>
             )}
 
-            {/* WIZARD 5: GERENCIAR CARTÃO & FATURA (2 PASSOS) */}
+            {/* WIZARD 6: ADICIONAR NOVO CARTÃO DE CRÉDITO (3 PASSOS) */}
+            {activeWizard === 'new_card' && (
+              <div className="space-y-5">
+                {wizardStep === 1 && (
+                  <div className="space-y-4">
+                    <h3 className="font-heading text-xl">
+                      Emissor e Bandeira do Cartão
+                    </h3>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        Instituição Emissora
+                      </label>
+                      <select
+                        value={newCardInst}
+                        onChange={(e) =>
+                          setNewCardInst(e.target.value as InstitutionCode)
+                        }
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      >
+                        {Object.values(InstitutionCode).map((inst) => (
+                          <option key={inst} value={inst}>
+                            {getInstitutionDisplayName(inst)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        Bandeira
+                      </label>
+                      <select
+                        value={newCardBrand}
+                        onChange={(e) =>
+                          setNewCardBrand(e.target.value as CardBrand)
+                        }
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      >
+                        <option value="MASTERCARD_BLACK">
+                          Mastercard Black
+                        </option>
+                        <option value="VISA_INFINITE">Visa Infinite</option>
+                        <option value="ELO_NANQUIM">Elo Nanquim</option>
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(2)}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                    >
+                      Continuar
+                    </button>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-4">
+                    <h3 className="font-heading text-xl">
+                      Identificação do Cartão
+                    </h3>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        Nome no Portal
+                      </label>
+                      <input
+                        type="text"
+                        value={newCardName}
+                        onChange={(e) => setNewCardName(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        4 Últimos Dígitos
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={newCardDigits}
+                        onChange={(e) => setNewCardDigits(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm font-mono"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(3)}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                    >
+                      Continuar
+                    </button>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-4">
+                    <h3 className="font-heading text-xl">
+                      Limite Total e Datas da Fatura
+                    </h3>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        Limite Total Aprovado (R$)
+                      </label>
+                      <input
+                        type="number"
+                        value={newCardLimit}
+                        onChange={(e) => setNewCardLimit(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs nexo-text-muted mb-1">
+                          Dia Fechamento
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="28"
+                          value={newCardClosing}
+                          onChange={(e) => setNewCardClosing(e.target.value)}
+                          className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs nexo-text-muted mb-1">
+                          Dia Vencimento
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="28"
+                          value={newCardDue}
+                          onChange={(e) => setNewCardDue(e.target.value)}
+                          className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCreateNewCard}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                    >
+                      Salvar Cartão no Perfil
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WIZARD 7: LANÇAR COMPRA NO CARTÃO (2 PASSOS) */}
+            {activeWizard === 'card_purchase' && (
+              <div className="space-y-5">
+                {wizardStep === 1 ? (
+                  <div className="space-y-3">
+                    <h3 className="font-heading text-xl">
+                      Em qual cartão foi a compra?
+                    </h3>
+                    {state.creditCards.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setPurchaseCardId(c.id);
+                          setWizardStep(2);
+                        }}
+                        className="w-full rounded-2xl nexo-elevated p-4 flex items-center justify-between text-left hover:border-[#ff5500]"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{c.cardName}</p>
+                          <p className="text-xs nexo-text-muted">
+                            Disponível: {formatCurrency(c.availableLimit)}
+                          </p>
+                        </div>
+                        <span className="font-mono text-xs">
+                          •••• {c.lastFourDigits}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <h3 className="font-heading text-xl">
+                      Dados da compra na fatura
+                    </h3>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        Estabelecimento / Descrição
+                      </label>
+                      <input
+                        type="text"
+                        value={purchaseTitle}
+                        onChange={(e) => setPurchaseTitle(e.target.value)}
+                        placeholder="Ex.: AWS Cloud, Passagem Aérea..."
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        Valor da compra (R$)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        value={purchaseAmount}
+                        onChange={(e) => setPurchaseAmount(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1">
+                        Categoria
+                      </label>
+                      <select
+                        value={purchaseCategory}
+                        onChange={(e) =>
+                          setPurchaseCategory(
+                            e.target.value as TransactionCategory,
+                          )
+                        }
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      >
+                        {Object.values(TransactionCategory).map((c) => (
+                          <option key={c} value={c}>
+                            {getCategoryLabel(c)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleCreateCardPurchase()}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                    >
+                      Confirmar Compra no Cartão
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WIZARD 8: GERENCIAR CARTÃO & FATURA (2 PASSOS) */}
             {activeWizard === 'card_manage' && (
               <div className="space-y-5">
                 {wizardStep === 1 ? (
@@ -1838,7 +3029,88 @@ export function DashboardPage() {
               </div>
             )}
 
-            {/* WIZARD 6: EDITAR META DE CENTRO DE CUSTO (2 PASSOS) */}
+            {/* WIZARD 9: NOVO CENTRO DE CUSTO (2 PASSOS) */}
+            {activeWizard === 'new_cost_center' && (
+              <div className="space-y-4">
+                <h3 className="font-heading text-xl">
+                  Novo Centro de Custo Corporativo
+                </h3>
+                <div>
+                  <label className="block text-xs nexo-text-muted mb-1">
+                    Nome do Centro de Custo
+                  </label>
+                  <input
+                    type="text"
+                    value={newCostName}
+                    onChange={(e) => setNewCostName(e.target.value)}
+                    placeholder="Ex.: Marketing & Growth"
+                    className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs nexo-text-muted mb-1">
+                    Área Responsável
+                  </label>
+                  <input
+                    type="text"
+                    value={newCostArea}
+                    onChange={(e) => setNewCostArea(e.target.value)}
+                    className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs nexo-text-muted mb-1">
+                    Categoria Vinculada
+                  </label>
+                  <select
+                    value={newCostCat}
+                    onChange={(e) =>
+                      setNewCostCat(e.target.value as TransactionCategory)
+                    }
+                    className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                  >
+                    {Object.values(TransactionCategory).map((c) => (
+                      <option key={c} value={c}>
+                        {getCategoryLabel(c)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs nexo-text-muted mb-1">
+                      Meta Ideal (R$)
+                    </label>
+                    <input
+                      type="number"
+                      value={newCostIdeal}
+                      onChange={(e) => setNewCostIdeal(e.target.value)}
+                      className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs nexo-text-muted mb-1">
+                      Teto Alerta (R$)
+                    </label>
+                    <input
+                      type="number"
+                      value={newCostCeiling}
+                      onChange={(e) => setNewCostCeiling(e.target.value)}
+                      className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCreateCostCenter}
+                  className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                >
+                  Salvar Centro de Custo
+                </button>
+              </div>
+            )}
+
+            {/* WIZARD 10: EDITAR META DE CENTRO DE CUSTO (2 PASSOS) */}
             {activeWizard === 'cost_budget' && (
               <div className="space-y-5">
                 {wizardStep === 1 ? (
@@ -1920,7 +3192,80 @@ export function DashboardPage() {
               </div>
             )}
 
-            {/* WIZARD 7: CADASTRAR NOVA CHAVE PIX (2 PASSOS) */}
+            {/* WIZARD 11: NOVA ASSINATURA RECORRENTE */}
+            {activeWizard === 'new_subscription' && (
+              <div className="space-y-4">
+                <h3 className="font-heading text-xl">
+                  Cadastrar Assinatura Recorrente
+                </h3>
+                <div>
+                  <label className="block text-xs nexo-text-muted mb-1">
+                    Nome do Serviço / Contrato
+                  </label>
+                  <input
+                    type="text"
+                    value={newSubName}
+                    onChange={(e) => setNewSubName(e.target.value)}
+                    placeholder="Ex.: Vercel Pro, GitHub Copilot, Adobe..."
+                    className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs nexo-text-muted mb-1">
+                      Valor Mensal (R$)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newSubAmount}
+                      onChange={(e) => setNewSubAmount(e.target.value)}
+                      className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs nexo-text-muted mb-1">
+                      Dia de Cobrança
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="28"
+                      value={newSubDay}
+                      onChange={(e) => setNewSubDay(e.target.value)}
+                      className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs nexo-text-muted mb-1">
+                    Instituição Pagadora
+                  </label>
+                  <select
+                    value={newSubInst}
+                    onChange={(e) =>
+                      setNewSubInst(e.target.value as InstitutionCode)
+                    }
+                    className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                  >
+                    {Object.values(InstitutionCode).map((inst) => (
+                      <option key={inst} value={inst}>
+                        {getInstitutionDisplayName(inst)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCreateSubscription}
+                  className="w-full rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                >
+                  Adicionar ao Radar de Assinaturas
+                </button>
+              </div>
+            )}
+
+            {/* WIZARD 12: CADASTRAR NOVA CHAVE PIX (2 PASSOS) */}
             {activeWizard === 'new_pix_key' && (
               <div className="space-y-5">
                 {wizardStep === 1 ? (
@@ -2010,7 +3355,7 @@ export function DashboardPage() {
               </div>
             )}
 
-            {/* WIZARD 8: ASSISTENTE FINANCEIRO & AUDITORIA */}
+            {/* WIZARD 13: ASSISTENTE FINANCEIRO & AUDITORIA */}
             {activeWizard === 'assistant' && (
               <div className="space-y-5">
                 <div>
