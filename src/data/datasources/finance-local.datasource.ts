@@ -3,7 +3,11 @@
  * inspirado em core/lib/src/services/media/data/datasources/media_local_data_source.dart do App_Nasa.
  */
 
-import { CacheException, safeJsonParse } from '@/core';
+import {
+  CacheException,
+  FirebaseClientManager,
+  safeJsonParse,
+} from '@/core';
 import { BankAccountModel } from '../models/bank-account.model';
 import { TransactionModel } from '../models/transaction.model';
 import { INITIAL_BANK_ACCOUNTS, INITIAL_TRANSACTIONS } from './seed-data';
@@ -66,8 +70,18 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
     try {
       FinanceLocalDataSourceImpl._memoryAccounts = [...accounts];
       if (this._hasBrowserStorage()) {
-        const serialized = JSON.stringify(accounts.map((acc) => acc.toJson()));
-        window.localStorage.setItem(ACCOUNTS_STORAGE_KEY, serialized);
+        const jsonList = accounts.map((acc) => acc.toJson());
+        window.localStorage.setItem(
+          ACCOUNTS_STORAGE_KEY,
+          JSON.stringify(jsonList),
+        );
+        const currentTx = (
+          FinanceLocalDataSourceImpl._memoryTransactions ?? []
+        ).map((tx) => tx.toJson());
+        void FirebaseClientManager.saveUserSnapshotToFirestore(
+          jsonList,
+          currentTx,
+        );
       }
     } catch (error) {
       const msg =
@@ -113,10 +127,18 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
     try {
       FinanceLocalDataSourceImpl._memoryTransactions = [...transactions];
       if (this._hasBrowserStorage()) {
-        const serialized = JSON.stringify(
-          transactions.map((tx) => tx.toJson()),
+        const jsonList = transactions.map((tx) => tx.toJson());
+        window.localStorage.setItem(
+          TRANSACTIONS_STORAGE_KEY,
+          JSON.stringify(jsonList),
         );
-        window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, serialized);
+        const currentAcc = (
+          FinanceLocalDataSourceImpl._memoryAccounts ?? []
+        ).map((acc) => acc.toJson());
+        void FirebaseClientManager.saveUserSnapshotToFirestore(
+          currentAcc,
+          jsonList,
+        );
       }
     } catch (error) {
       const msg =

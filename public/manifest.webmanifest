@@ -2,10 +2,10 @@
   "name": "Nexo Finance by Exímia Tech",
   "short_name": "Nexo Finance",
   "description": "Controle Financeiro Inteligente com Open Finance, Assistente IA (estilo Pierre) e Conta Digital PIX Asaas.",
-  "start_url": "/app",
+  "start_url": "/portal",
   "display": "standalone",
-  "background_color": "#050a0b",
-  "theme_color": "#185054",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
   "lang": "pt-BR",
   "icons": [
     {

@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import '../src/index.css';
 
 export const metadata: Metadata = {
-  title: 'Nexo Finance by Exímia Tech | Open Finance, Assistente IA & PIX',
+  title: 'Nexo — Controle Financeiro, Open Finance & PIX',
   description:
-    'Plataforma de controle financeiro inteligente com integração Open Finance, detecção de gastos estilo Pierre e conta digital PIX Asaas. Arquitetura Limpa (Clean Architecture) e SOLID em TypeScript estrito.',
+    'Sua vida financeira consolidada em um único lugar. Open Finance, PIX instantâneo e inteligência financeira em uma experiência minimalista.',
   manifest: '/manifest.webmanifest',
   icons: {
     icon: [
@@ -24,8 +24,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f4f7f7' },
-    { media: '(prefers-color-scheme: dark)', color: '#185054' },
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
   ],
 };
 
@@ -51,7 +51,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-screen bg-[#050a0b] text-white antialiased selection:bg-[#0df0b2]/20 selection:text-[#0df0b2] transition-colors duration-300">
+      <body className="min-h-screen nexo-page antialiased selection:bg-[#ff5500]/20 selection:text-[#ff5500] transition-colors duration-200">
         {children}
       </body>
     </html>

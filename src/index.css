@@ -18,29 +18,39 @@
   font-display: swap;
 }
 
-/* ─── Design Tokens (Paleta Oficial Exímia Tech + Nexo) ───── */
+/* ─── Design Tokens Minimalistas (Monocromático + Detalhe Laranja) ───── */
 @theme {
-  --color-eximia-primary-900: #185054;
-  --color-eximia-primary-700: #546b6e;
-  --color-eximia-primary-500: #859a9b;
-  --color-eximia-primary-300: #8baba6;
-  --color-eximia-primary-100: #b6c8c6;
-
-  --color-eximia-base-black: #000000;
-  --color-eximia-base-dark: #303030;
-  --color-eximia-base-muted: #8b8b8b;
-  --color-eximia-base-light: #d9d9d9;
-  --color-eximia-base-white: #ffffff;
-
-  --color-eximia-support-navy: #1f2f43;
-  --color-eximia-support-slate: #9cafc6;
-
-  --color-eximia-accent-green: #0df0b2;
-  --color-eximia-accent-blue: #004fff;
-  --color-eximia-accent-orange: #ef5000;
+  --color-nexo-black: #09090b;
+  --color-nexo-surface: #121215;
+  --color-nexo-border: #242429;
+  --color-nexo-muted: #8e8e93;
+  --color-nexo-white: #fafafa;
+  --color-nexo-orange: #ff5500;
 
   --font-heading: 'Michroma', sans-serif;
   --font-body: 'Archivo', sans-serif;
+}
+
+:root {
+  --bg-page: #09090b;
+  --bg-card: #121215;
+  --bg-elevated: #18181c;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent-orange: #ff5500;
+}
+
+html[data-theme="light"] {
+  --bg-page: #fafafa;
+  --bg-card: #ffffff;
+  --bg-elevated: #f4f4f5;
+  --border-subtle: rgba(9, 9, 11, 0.09);
+  --text-primary: #09090b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --accent-orange: #ef5000;
 }
 
 *,
@@ -55,64 +65,50 @@ html {
 
 body {
   margin: 0;
-  background: #050a0b;
-  color: #ffffff;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
   font-family: 'Archivo', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Adaptação Completa para Tema Claro (data-theme="light") ─── */
-html[data-theme="light"] body,
-html[data-theme="light"] .bg-\[\#050a0b\],
-html[data-theme="light"] .bg-\[\#071012\] {
-  background-color: #f3f7f7 !important;
-  color: #0d1f22 !important;
+/* Utilitários semânticos para tema claro/escuro neutro */
+.nexo-page {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
 }
 
-html[data-theme="light"] header {
-  background-color: rgba(243, 247, 247, 0.9) !important;
-  border-color: rgba(24, 80, 84, 0.2) !important;
+.nexo-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+}
+
+.nexo-elevated {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+.nexo-text-secondary {
+  color: var(--text-secondary);
+}
+
+.nexo-text-muted {
+  color: var(--text-muted);
+}
+
+/* Compatibilidade da página /arquitetura no modo claro */
+html[data-theme="light"] .bg-\[\#050a0b\],
+html[data-theme="light"] .bg-\[\#09090b\] {
+  background-color: #fafafa !important;
+  color: #09090b !important;
 }
 
 html[data-theme="light"] .bg-\[\#0a1416\],
-html[data-theme="light"] .bg-\[\#0a1416\]\/90,
-html[data-theme="light"] .bg-\[\#0b1719\]\/90,
-html[data-theme="light"] .from-\[\#0d1f22\]\/90,
-html[data-theme="light"] .from-\[\#0b191b\] {
-  background: #ffffff !important;
-  border-color: rgba(24, 80, 84, 0.22) !important;
-  box-shadow: 0 8px 24px rgba(13, 31, 34, 0.06);
-}
-
-html[data-theme="light"] .bg-black,
-html[data-theme="light"] .bg-black\/50,
-html[data-theme="light"] .bg-black\/60,
-html[data-theme="light"] .bg-black\/70,
-html[data-theme="light"] .bg-black\/80,
-html[data-theme="light"] .bg-black\/90 {
-  background-color: #ebf1f1 !important;
-  border-color: rgba(24, 80, 84, 0.22) !important;
+html[data-theme="light"] .bg-\[\#121215\] {
+  background-color: #ffffff !important;
+  border-color: rgba(9, 9, 11, 0.1) !important;
 }
 
 html[data-theme="light"] .text-white {
-  color: #0d1f22 !important;
-}
-
-html[data-theme="light"] .text-\[\#b6c8c6\],
-html[data-theme="light"] .text-\[\#d9d9d9\] {
-  color: #2c4a4e !important;
-}
-
-html[data-theme="light"] .text-\[\#859a9b\],
-html[data-theme="light"] .text-\[\#8baba6\] {
-  color: #46666a !important;
-}
-
-html[data-theme="light"] .text-\[\#0df0b2\] {
-  color: #0a8a68 !important;
-}
-
-html[data-theme="light"] footer {
-  background-color: #e4eded !important;
+  color: #09090b !important;
 }

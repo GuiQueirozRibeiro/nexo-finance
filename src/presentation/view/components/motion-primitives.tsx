@@ -127,7 +127,7 @@ export function BarraProgresso() {
     <motion.div
       style={{
         scaleX,
-        background: 'linear-gradient(90deg, #185054 0%, #0df0b2 65%, #004fff 100%)',
+        background: '#ff5500',
       }}
       className="fixed top-0 left-0 right-0 z-[60] h-[2px] origin-left pointer-events-none"
     />

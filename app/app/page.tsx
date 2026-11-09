@@ -1,5 +1,5 @@
-import { DashboardPage } from '@/presentation/view/dashboard/dashboard-page';
+import { redirect } from 'next/navigation';
 
-export default function AppDashboardRoute() {
-  return <DashboardPage />;
+export default function LegacyAppRouteRedirect() {
+  redirect('/portal');
 }

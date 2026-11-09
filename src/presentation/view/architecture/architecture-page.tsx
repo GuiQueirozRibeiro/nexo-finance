@@ -255,21 +255,21 @@ export function ArchitecturePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050a0b] text-white">
+    <div className="min-h-screen nexo-page">
       <NexoNavbar />
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-10 space-y-12">
         {/* HEADER */}
-        <section className="rounded-2xl border border-[#185054]/70 bg-gradient-to-r from-[#0b191b] to-[#060d0e] p-6 sm:p-8">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[#0df0b2] mb-2">
+        <section className="rounded-3xl nexo-card p-6 sm:p-8">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[#ff5500] mb-2">
             <Cpu className="h-4 w-4" />
             <span>PROJETO DE DISCIPLINA • TYPESCRIPT PARA DESENVOLVIMENTO FRONT-END [26E4_2]</span>
           </div>
-          <h1 className="font-heading text-2xl sm:text-3xl text-white mb-3">
+          <h1 className="font-heading text-2xl sm:text-3xl mb-3">
             Arquitetura Limpa, SOLID e Mapa da Rubrica
           </h1>
-          <p className="text-sm sm:text-base text-[#b6c8c6] max-w-3xl leading-relaxed">
-            Esta página documenta a engenharia do <strong>Nexo Finance</strong>, conectando
+          <p className="text-sm sm:text-base nexo-text-secondary max-w-3xl leading-relaxed">
+            Esta página documenta a engenharia do <strong>Nexo</strong>, conectando
             a arquitetura em 3 camadas do projeto de referência <code>pos/App_Nasa</code> aos{' '}
             <strong>16 itens avaliados na rubrica oficial</strong>.
           </p>
@@ -279,11 +279,11 @@ export function ArchitecturePage() {
         <section className="space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="font-heading text-lg text-white flex items-center gap-2">
-                <Layers className="h-5 w-5 text-[#0df0b2]" />
+              <h2 className="font-heading text-lg flex items-center gap-2">
+                <Layers className="h-5 w-5 text-[#ff5500]" />
                 16 Itens da Rubrica Mapeados no Código
               </h2>
-              <p className="text-xs text-[#8baba6]">
+              <p className="text-xs nexo-text-muted">
                 Filtre por competência para inspecionar os arquivos e contratos TypeScript.
               </p>
             </div>
@@ -302,10 +302,10 @@ export function ArchitecturePage() {
                   onClick={() =>
                     setSelectedGroup(tab.id as 'ALL' | 'C1' | 'C2' | 'C3' | 'C4')
                   }
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-all ${
                     selectedGroup === tab.id
-                      ? 'bg-[#0df0b2] text-black'
-                      : 'border border-[#185054] bg-[#0a1416] text-[#b6c8c6] hover:text-white'
+                      ? 'bg-[#ff5500] text-white'
+                      : 'nexo-card nexo-text-secondary'
                   }`}
                 >
                   {tab.label}
@@ -318,25 +318,25 @@ export function ArchitecturePage() {
             {visibleItems.map((item) => (
               <div
                 key={item.id}
-                className="rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-5 flex flex-col justify-between space-y-3"
+                className="rounded-3xl nexo-card p-5 flex flex-col justify-between space-y-3"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0df0b2]">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ff5500]">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       {item.rubricTitle}
                     </span>
                   </div>
-                  <div className="inline-flex items-center gap-1.5 rounded bg-black/70 border border-[#185054]/50 px-2 py-0.5 text-[11px] font-mono text-[#8baba6] mb-2">
-                    <FileCode className="h-3 w-3 text-[#0df0b2]" />
+                  <div className="inline-flex items-center gap-1.5 rounded-lg nexo-elevated px-2.5 py-1 text-[11px] font-mono nexo-text-secondary mb-2">
+                    <FileCode className="h-3 w-3 text-[#ff5500]" />
                     {item.filePath}
                   </div>
-                  <p className="text-xs text-[#d9d9d9] leading-relaxed">
+                  <p className="text-xs nexo-text-secondary leading-relaxed">
                     {item.explanation}
                   </p>
                 </div>
 
-                <pre className="rounded-xl bg-black/90 border border-[#185054]/50 p-3 text-[11px] font-mono text-[#b6c8c6] overflow-x-auto">
+                <pre className="rounded-2xl nexo-elevated p-3 text-[11px] font-mono nexo-text-secondary overflow-x-auto">
                   <code>{item.codeSnippet}</code>
                 </pre>
               </div>
@@ -345,14 +345,14 @@ export function ArchitecturePage() {
         </section>
 
         {/* SEÇÃO 5: EVOLUÇÃO E REFATORAÇÃO (JS -> TS) */}
-        <section className="rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-6 space-y-5">
+        <section className="rounded-3xl nexo-card p-6 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="font-heading text-lg text-white flex items-center gap-2">
-                <GitCompare className="h-5 w-5 text-[#0df0b2]" />
+              <h2 className="font-heading text-lg flex items-center gap-2">
+                <GitCompare className="h-5 w-5 text-[#ff5500]" />
                 Seção 5 • Evidência de Evolução e Refatoração (JS Legado → TS Estrito)
               </h2>
-              <p className="text-xs text-[#8baba6]">
+              <p className="text-xs nexo-text-muted">
                 Comparativo prático em <code>src/legacy/legacy-reconciliation.ts</code>{' '}
                 corrigindo coerção de string, propagação de <code>NaN</code> e falta de
                 exaustividade.
@@ -362,27 +362,27 @@ export function ArchitecturePage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
-              <span className="block text-xs font-semibold text-[#ef5000] mb-1.5">
+              <span className="block text-xs font-semibold text-[#ff5500] mb-1.5">
                 ANTES — JavaScript sem Tipagem Estática
               </span>
-              <pre className="rounded-xl bg-black border border-[#ef5000]/40 p-4 text-[11px] font-mono text-[#d9d9d9] overflow-x-auto max-h-72">
+              <pre className="rounded-2xl nexo-elevated p-4 text-[11px] font-mono nexo-text-secondary overflow-x-auto max-h-72">
                 <code>{LEGACY_JS_CODE_SNAPSHOT}</code>
               </pre>
             </div>
             <div>
-              <span className="block text-xs font-semibold text-[#0df0b2] mb-1.5">
+              <span className="block text-xs font-semibold mb-1.5">
                 DEPOIS — TypeScript Estrito com unknown + assertNever + Either
               </span>
-              <pre className="rounded-xl bg-black border border-[#0df0b2]/40 p-4 text-[11px] font-mono text-[#d9d9d9] overflow-x-auto max-h-72">
+              <pre className="rounded-2xl nexo-elevated p-4 text-[11px] font-mono nexo-text-secondary overflow-x-auto max-h-72">
                 <code>{REFACTORED_TS_CODE_SNAPSHOT}</code>
               </pre>
             </div>
           </div>
 
           {/* Testador Interativo da Refatoração */}
-          <div className="rounded-xl border border-[#185054] bg-black/70 p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="rounded-2xl nexo-elevated p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="flex-1">
-              <label className="block text-[11px] text-[#8baba6] mb-1">
+              <label className="block text-[11px] nexo-text-muted mb-1">
                 Teste um valor externo (ex.: &quot;250.50&quot; ou um texto inválido como
                 &quot;erro-abc&quot;):
               </label>
@@ -390,13 +390,13 @@ export function ArchitecturePage() {
                 type="text"
                 value={simInputAmount}
                 onChange={(e) => setSimInputAmount(e.target.value)}
-                className="w-full rounded-lg border border-[#185054] bg-[#0a1416] px-3 py-1.5 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
+                className="w-full rounded-xl nexo-card px-3 py-2 text-xs focus:border-[#ff5500] focus:outline-none"
               />
             </div>
             <button
               type="button"
               onClick={runLiveRefactoringDemo}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0df0b2] px-4 py-2.5 text-xs font-bold text-black hover:bg-white transition-all"
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#ff5500] px-5 py-2.5 text-xs font-medium text-white hover:opacity-90 transition-opacity"
             >
               <Play className="h-3.5 w-3.5" />
               Executar Lote Refatorado
@@ -404,20 +404,20 @@ export function ArchitecturePage() {
           </div>
 
           {simResultText && (
-            <div className="rounded-xl border border-[#0df0b2]/40 bg-[#0df0b2]/10 p-3 text-xs text-white font-mono">
+            <div className="rounded-2xl border border-[#ff5500]/40 bg-[#ff5500]/10 p-3.5 text-xs font-mono">
               {simResultText}
             </div>
           )}
         </section>
 
         {/* SEÇÃO 6: AVALIAÇÃO DE SUGESTÕES DE IA */}
-        <section className="rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-6 space-y-4">
+        <section className="rounded-3xl nexo-card p-6 space-y-4">
           <div>
-            <h2 className="font-heading text-lg text-white flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-[#0df0b2]" />
+            <h2 className="font-heading text-lg flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-[#ff5500]" />
               Seção 6 • Registro e Avaliação Técnica do Uso de IA
             </h2>
-            <p className="text-xs text-[#8baba6]">
+            <p className="text-xs nexo-text-muted">
               Decisões técnicas onde sugestões padrão foram ajustadas para preservar a
               segurança de tipos, o encapsulamento OOP e a simplicidade da arquitetura.
             </p>
@@ -427,26 +427,26 @@ export function ArchitecturePage() {
             {AI_CRITICAL_REVIEWS.map((review) => (
               <div
                 key={review.id}
-                className="rounded-xl border border-[#185054]/60 bg-black/60 p-4 space-y-2"
+                className="rounded-2xl nexo-elevated p-5 space-y-2"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-xs text-[#0df0b2]">
+                  <span className="font-semibold text-xs text-[#ff5500]">
                     {review.topic}
                   </span>
-                  <span className="text-[11px] font-mono text-[#859a9b]">
+                  <span className="text-[11px] font-mono nexo-text-muted">
                     {review.relatedFile}
                   </span>
                 </div>
-                <p className="text-xs text-[#b6c8c6]">
-                  <strong className="text-white">Sugestão Inicial:</strong>{' '}
+                <p className="text-xs nexo-text-secondary">
+                  <strong>Sugestão Inicial:</strong>{' '}
                   {review.aiInitialSuggestion}
                 </p>
-                <p className="text-xs text-[#b6c8c6]">
-                  <strong className="text-[#ef5000]">Problema Identificado:</strong>{' '}
+                <p className="text-xs nexo-text-secondary">
+                  <strong className="text-[#ff5500]">Problema Identificado:</strong>{' '}
                   {review.identifiedProblem}
                 </p>
-                <p className="text-xs text-[#d9d9d9]">
-                  <strong className="text-[#0df0b2]">Decisão Adotada:</strong>{' '}
+                <p className="text-xs nexo-text-secondary">
+                  <strong>Decisão Adotada:</strong>{' '}
                   {review.adoptedEngineeringDecision}
                 </p>
               </div>

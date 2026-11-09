@@ -1,936 +1,1188 @@
 'use client';
 
-import React, { useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   AlertTriangle,
-  ArrowDownRight,
+  ArrowDownLeft,
+  ArrowLeft,
   ArrowUpRight,
-  Bot,
+  Building2,
   Check,
   Copy,
-  Filter,
+  Eye,
+  EyeOff,
   Plus,
   QrCode,
   RefreshCw,
   RotateCcw,
   Search,
   Send,
-  ShieldAlert,
-  ShieldCheck,
   Sparkles,
-  Wallet,
+  X,
 } from 'lucide-react';
 import {
   AppFlavor,
+  type DeepReadonly,
+  FirebaseClientManager,
   InstitutionCode,
+  type NexoAuthUser,
   TransactionCategory,
   getCategoryLabel,
+  getInstitutionDisplayName,
 } from '@/core';
 import type { PixKeyType, TransactionType } from '@/domain';
-import { useFinanceViewModel } from '@/presentation/hooks/use-finance-viewmodel';
+import {
+  type FinanceViewState,
+  createFinanceViewModel,
+} from '@/presentation/viewmodel/finance.viewmodel';
 import { NexoNavbar } from '../components/nexo-navbar';
 
-const QUICK_PROMPTS = [
-  'Tem alguma cobrança duplicada?',
-  'Quais são minhas assinaturas recorrentes?',
-  'Qual meu saldo consolidado?',
-  'Onde mais gastei neste mês?',
-] as const;
+type ActiveWizard =
+  | null
+  | 'transfer_pix'
+  | 'charge_pix'
+  | 'new_transaction'
+  | 'open_finance'
+  | 'assistant';
+
+function formatCurrency(value: number, hidden = false): string {
+  if (hidden) {
+    return 'R$ ••••••';
+  }
+  return value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+}
 
 export function DashboardPage() {
-  const { viewModel, state } = useFinanceViewModel();
-
-  // Estados locais de filtro de transações
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<
+  const viewModel = useMemo(() => createFinanceViewModel(), []);
+  const [state, setState] = useState<DeepReadonly<FinanceViewState>>(
+    () => viewModel.state,
+  );
+  const [authUser, setAuthUser] = useState<NexoAuthUser | null>(null);
+  const [hideBalances, setHideBalances] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<
     TransactionCategory | 'ALL'
   >('ALL');
-  const [selectedInstitution, setSelectedInstitution] = useState<
-    InstitutionCode | 'ALL'
-  >('ALL');
 
-  // Estados do módulo PIX Asaas
-  const [pixTab, setPixTab] = useState<'CHARGE' | 'TRANSFER'>('CHARGE');
-  const [chargeAmount, setChargeAmount] = useState('450.00');
-  const [chargeDesc, setChargeDesc] = useState('Consultoria Técnica Exímia Tech');
+  // Estado do Wizard ativo e passo atual
+  const [activeWizard, setActiveWizard] = useState<ActiveWizard>(null);
+  const [wizardStep, setWizardStep] = useState<number>(1);
+
+  // Estado Wizard: Transferir PIX (3 passos)
+  const [pixTransferAmount, setPixTransferAmount] = useState('150');
+  const [pixKeyType, setPixKeyType] = useState<PixKeyType>('EMAIL');
+  const [pixKeyValue, setPixKeyValue] = useState('fornecedor@eximiatech.com.br');
+  const [pixRecipientName, setPixRecipientName] = useState(
+    'Exímia Cloud Services',
+  );
+
+  // Estado Wizard: Cobrar PIX QR Code (2 passos)
+  const [pixChargeAmount, setPixChargeAmount] = useState('250');
+  const [pixChargeDesc, setPixChargeDesc] = useState('Consultoria Nexo');
   const [copiedQr, setCopiedQr] = useState(false);
 
-  const [transferRecipient, setTransferRecipient] = useState(
-    'Fornecedor Cloud Brasil',
-  );
-  const [transferKeyType, setTransferKeyType] = useState<PixKeyType>('EMAIL');
-  const [transferKey, setTransferKey] = useState('financeiro@parceiro.com.br');
-  const [transferAmount, setTransferAmount] = useState('180.00');
-
-  // Estado do Chat Pierre AI
-  const [chatInput, setChatInput] = useState('');
-
-  // Estado de Novo Lançamento
-  const [newTxTitle, setNewTxTitle] = useState('');
-  const [newTxAmount, setNewTxAmount] = useState('');
-  const [newTxType, setNewTxType] = useState<TransactionType>('EXPENSE');
-  const [newTxCategory, setNewTxCategory] = useState<TransactionCategory>(
+  // Estado Wizard: Novo Lançamento (3 passos)
+  const [txType, setTxType] = useState<TransactionType>('EXPENSE');
+  const [txAmount, setTxAmount] = useState('');
+  const [txTitle, setTxTitle] = useState('');
+  const [txCategory, setTxCategory] = useState<TransactionCategory>(
     TransactionCategory.FOOD,
   );
-  const [newTxInstitution, setNewTxInstitution] = useState<InstitutionCode>(
+  const [txInstitution, setTxInstitution] = useState<InstitutionCode>(
     InstitutionCode.NUBANK,
   );
 
+  // Estado Wizard: Open Finance (2 passos)
+  const [selectedBankId, setSelectedBankId] = useState<string | null>(null);
+
+  // Estado Assistente
+  const [chatInput, setChatInput] = useState('');
+  const [searchText, setSearchText] = useState('');
+
+  useEffect(() => {
+    const unsubVm = viewModel.subscribe((next) => setState(next));
+    void viewModel.loadDashboard();
+    const unsubAuth = FirebaseClientManager.subscribe((user) => {
+      setAuthUser(user);
+    });
+    return () => {
+      unsubVm();
+      unsubAuth();
+    };
+  }, [viewModel]);
+
   const summary = state.summary;
+  const userName = authUser?.displayName ?? 'Guilherme';
 
-  const handleFilterChange = (
-    nextQuery: string,
-    nextCat: TransactionCategory | 'ALL',
-    nextInst: InstitutionCode | 'ALL',
-  ) => {
-    setSearchQuery(nextQuery);
-    setSelectedCategory(nextCat);
-    setSelectedInstitution(nextInst);
-    void viewModel.filterTransactions({
-      query: nextQuery,
-      category: nextCat,
-      institution: nextInst,
-    });
+  const openWizard = (wizard: ActiveWizard) => {
+    viewModel.clearNotices();
+    setActiveWizard(wizard);
+    setWizardStep(1);
   };
 
-  const handleCreatePixCharge = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const numeric = Number(chargeAmount.replace(',', '.'));
-    await viewModel.generatePixQrCode(numeric, chargeDesc);
+  const closeWizard = () => {
+    setActiveWizard(null);
+    setWizardStep(1);
   };
 
-  const handleExecutePixTransfer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const numeric = Number(transferAmount.replace(',', '.'));
-    await viewModel.sendPixTransfer({
-      sourceAccountId: 'acc-asaas-eximia',
-      recipientName: transferRecipient,
-      pixKeyType: transferKeyType,
-      pixKey: transferKey,
-      amount: numeric,
-      description: `PIX ${transferKeyType}`,
-    });
-  };
-
-  const handleAddTransaction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const numeric = Number(newTxAmount.replace(',', '.'));
-    const ok = await viewModel.addNewTransaction({
-      id: `tx-manual-${Date.now()}`,
-      title: newTxTitle,
-      amount: numeric,
-      type: newTxType,
-      category: newTxCategory,
-      institution: newTxInstitution,
-      dateIso: new Date().toISOString().slice(0, 10),
+  const handleConfirmPixTransfer = async () => {
+    const asaasAccount =
+      state.accounts.find((a) => a.institution === InstitutionCode.ASAAS) ??
+      state.accounts[0];
+    const ok = await viewModel.sendPixTransfer({
+      sourceAccountId: asaasAccount?.id ?? 'acc-asaas',
+      amount: Number(pixTransferAmount),
+      pixKeyType,
+      pixKey: pixKeyValue,
+      recipientName: pixRecipientName,
+      description: 'Transferência PIX via Portal Nexo',
     });
     if (ok) {
-      setNewTxTitle('');
-      setNewTxAmount('');
+      closeWizard();
     }
   };
 
-  const handleSendChat = (e: React.FormEvent) => {
+  const handleGeneratePixQr = async (e: FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim()) return;
+    const ok = await viewModel.generatePixQrCode(
+      Number(pixChargeAmount),
+      pixChargeDesc,
+    );
+    if (ok) {
+      setWizardStep(2);
+    }
+  };
+
+  const handleCopyQrPayload = async (payload: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(payload);
+      setCopiedQr(true);
+      setTimeout(() => setCopiedQr(false), 2000);
+    }
+  };
+
+  const handleCreateTransaction = async () => {
+    if (!txTitle.trim() || !txAmount) {
+      return;
+    }
+    const ok = await viewModel.addNewTransaction({
+      id: `tx-${Date.now()}`,
+      title: txTitle.trim(),
+      amount: Number(txAmount),
+      type: txType,
+      category: txCategory,
+      institution: txInstitution,
+      dateIso: new Date().toISOString().slice(0, 10),
+    });
+    if (ok) {
+      setTxTitle('');
+      setTxAmount('');
+      closeWizard();
+    }
+  };
+
+  const handleAskAssistant = (e: FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) {
+      return;
+    }
     viewModel.askAssistant(chatInput);
     setChatInput('');
   };
 
+  const selectedBank =
+    state.accounts.find((a) => a.id === selectedBankId) ?? state.accounts[0];
+
   return (
-    <div className="min-h-screen bg-[#050a0b] text-white">
+    <div className="min-h-screen nexo-page flex flex-col">
       <NexoNavbar />
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* TOP FLAVOR & ENVIRONMENT BAR */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-[#185054]/70 bg-[#0b1719]/90 p-5">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 sm:px-6 py-8 sm:py-10 space-y-8">
+        {/* TOPO ESTILO NUBANK: Saudação + Controles discretos */}
+        <section className="flex items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2.5 mb-1">
-              <span className="font-heading text-sm sm:text-base text-white">
-                CENTRAL OPEN FINANCE &amp; CONTA DIGITAL PIX
-              </span>
-              <span className="rounded-full border border-[#0df0b2]/40 bg-[#0df0b2]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#0df0b2]">
-                Flavor.{state.activeFlavor}
-              </span>
-            </div>
-            <p className="text-xs text-[#8baba6]">
-              alterne entre o simulador determinístico (<code>DEV</code>) e o proxy de
-              integração Asaas PIX (<code>PROD /api/asaas/pix</code>).
+            <p className="text-xs nexo-text-muted mb-0.5">
+              {authUser
+                ? 'Sincronizado com Firebase'
+                : 'Sessão Local • Entre para sincronizar na nuvem'}
             </p>
+            <h1 className="font-heading text-xl sm:text-2xl tracking-tight">
+              Olá, {userName}
+            </h1>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="inline-flex rounded-xl border border-[#185054] bg-black p-1">
-              <button
-                type="button"
-                onClick={() => viewModel.switchFlavor(AppFlavor.DEV)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setHideBalances((prev) => !prev)}
+              title={hideBalances ? 'Mostrar valores' : 'Ocultar valores'}
+              className="flex h-9 w-9 items-center justify-center rounded-full nexo-card nexo-text-secondary hover:text-[#ff5500] transition-colors"
+            >
+              {hideBalances ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                viewModel.switchFlavor(
                   state.activeFlavor === AppFlavor.DEV
-                    ? 'bg-[#0df0b2] text-black'
-                    : 'text-[#8baba6] hover:text-white'
-                }`}
-              >
-                DEV (Sandbox)
-              </button>
-              <button
-                type="button"
-                onClick={() => viewModel.switchFlavor(AppFlavor.PROD)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                  state.activeFlavor === AppFlavor.PROD
-                    ? 'bg-[#004fff] text-white'
-                    : 'text-[#8baba6] hover:text-white'
-                }`}
-              >
-                PROD (Asaas API)
-              </button>
-            </div>
+                    ? AppFlavor.PROD
+                    : AppFlavor.DEV,
+                )
+              }
+              title="Alternar ambiente do gateway PIX"
+              className="rounded-full nexo-card px-3 py-1.5 text-[11px] font-medium nexo-text-secondary hover:border-[#ff5500]/50 transition-colors"
+            >
+              {state.activeFlavor === AppFlavor.DEV ? 'Sandbox' : 'Asaas Live'}
+            </button>
 
             <button
               type="button"
               onClick={() => void viewModel.resetDemoData()}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#185054] bg-[#185054]/20 px-3 py-2 text-xs text-[#b6c8c6] hover:border-[#0df0b2]/50 hover:text-white"
+              title="Restaurar dados iniciais"
+              className="flex h-9 w-9 items-center justify-center rounded-full nexo-card nexo-text-secondary hover:text-[#ff5500] transition-colors"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Restaurar Seed
             </button>
-          </div>
-        </div>
-
-        {/* BANNERS DE FEEDBACK / ERRO (Either<Failure, Success>) */}
-        {state.errorMessage && (
-          <div className="flex items-center justify-between rounded-xl border border-[#ef5000]/60 bg-[#ef5000]/15 px-4 py-3 text-xs sm:text-sm text-white">
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle className="h-4 w-4 text-[#ef5000] shrink-0" />
-              <span>{state.errorMessage}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => viewModel.clearNotices()}
-              className="text-xs underline text-[#b6c8c6] hover:text-white"
-            >
-              Fechar
-            </button>
-          </div>
-        )}
-
-        {state.feedbackBanner && (
-          <div className="flex items-center justify-between rounded-xl border border-[#0df0b2]/50 bg-[#0df0b2]/10 px-4 py-3 text-xs sm:text-sm text-[#0df0b2]">
-            <div className="flex items-center gap-2.5">
-              <Sparkles className="h-4 w-4 shrink-0" />
-              <span>{state.feedbackBanner}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => viewModel.clearNotices()}
-              className="text-xs underline text-[#b6c8c6] hover:text-white"
-            >
-              OK
-            </button>
-          </div>
-        )}
-
-        {/* KPI CARDS */}
-        {summary && (
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-5">
-              <div className="flex items-center justify-between text-xs text-[#859a9b] mb-2">
-                <span>PATRIMÔNIO OPEN FINANCE</span>
-                <Wallet className="h-4 w-4 text-[#0df0b2]" />
-              </div>
-              <div className="font-heading text-2xl text-white">
-                R${' '}
-                {summary.consolidatedBalance.toLocaleString('pt-BR', {
-                  minimumFractionDigits: 2,
-                })}
-              </div>
-              <span className="text-xs text-[#0df0b2] mt-1 block">
-                {summary.authorizedAccountsCount} contas com consentimento ativo
-              </span>
-            </div>
-
-            <div className="rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-5">
-              <div className="flex items-center justify-between text-xs text-[#859a9b] mb-2">
-                <span>ENTRADAS NO MÊS</span>
-                <ArrowUpRight className="h-4 w-4 text-[#0df0b2]" />
-              </div>
-              <div className="font-heading text-2xl text-[#0df0b2]">
-                R${' '}
-                {summary.totalIncomeMonth.toLocaleString('pt-BR', {
-                  minimumFractionDigits: 2,
-                })}
-              </div>
-              <span className="text-xs text-[#8baba6] mt-1 block">
-                Taxa de poupança: {summary.savingsRatePercentage}%
-              </span>
-            </div>
-
-            <div className="rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-5">
-              <div className="flex items-center justify-between text-xs text-[#859a9b] mb-2">
-                <span>SAÍDAS &amp; PIX NO MÊS</span>
-                <ArrowDownRight className="h-4 w-4 text-[#ef5000]" />
-              </div>
-              <div className="font-heading text-2xl text-white">
-                R${' '}
-                {summary.totalExpensesMonth.toLocaleString('pt-BR', {
-                  minimumFractionDigits: 2,
-                })}
-              </div>
-              <span className="text-xs text-[#8baba6] mt-1 block">
-                Fluxo líquido: R$ {summary.netCashFlowMonth.toFixed(2)}
-              </span>
-            </div>
-
-            <div className="rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-5">
-              <div className="flex items-center justify-between text-xs text-[#859a9b] mb-2">
-                <span>RADAR DE ASSINATURAS</span>
-                <Bot className="h-4 w-4 text-[#004fff]" />
-              </div>
-              <div className="font-heading text-2xl text-white">
-                R${' '}
-                {summary.recurringSubscriptionsTotal.toLocaleString('pt-BR', {
-                  minimumFractionDigits: 2,
-                })}
-              </div>
-              <span className="text-xs text-[#ef5000] mt-1 block">
-                {summary.insights.filter((i) => i.severity === 'CRITICAL').length}{' '}
-                alerta(s) de duplicidade
-              </span>
-            </div>
-          </section>
-        )}
-
-        {/* CONTAS CONECTADAS OPEN FINANCE + PIX ASAAS GATEWAY */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Contas Open Finance */}
-          <div className="lg:col-span-7 rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-heading text-base text-white">
-                  Instituições Conectadas (Open Finance)
-                </h2>
-                <p className="text-xs text-[#8baba6]">
-                  Entidades OOP <code>BankAccount</code> com Tupla{' '}
-                  <code>readonly [banco, agencia, conta]</code> e controle de
-                  consentimento.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {state.accounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  className={`rounded-xl border p-4 transition-all ${
-                    acc.isAuthorized
-                      ? 'border-[#185054] bg-black/60'
-                      : 'border-[#ef5000]/40 bg-black/30 opacity-70'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-sm text-white">
-                      {acc.nickname}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        acc.isAuthorized
-                          ? 'bg-[#0df0b2]/15 text-[#0df0b2]'
-                          : 'bg-[#ef5000]/20 text-[#ef5000]'
-                      }`}
-                    >
-                      {acc.isAuthorized ? (
-                        <ShieldCheck className="h-3 w-3" />
-                      ) : (
-                        <ShieldAlert className="h-3 w-3" />
-                      )}
-                      {acc.consentStatus}
-                    </span>
-                  </div>
-
-                  <p className="text-[11px] font-mono text-[#859a9b] mb-3">
-                    {acc.formattedCoordinates}
-                  </p>
-
-                  <div className="font-heading text-lg text-white mb-3">
-                    R${' '}
-                    {acc.balance.toLocaleString('pt-BR', {
-                      minimumFractionDigits: 2,
-                    })}
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-2 border-t border-[#185054]/40">
-                    <button
-                      type="button"
-                      disabled={!acc.isAuthorized}
-                      onClick={() =>
-                        void viewModel.syncInstitution(acc.institution)
-                      }
-                      className="inline-flex items-center gap-1 rounded-lg bg-[#185054]/40 px-2.5 py-1.5 text-[11px] font-medium text-[#0df0b2] hover:bg-[#185054] disabled:opacity-40"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      Sincronizar CDI
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void viewModel.toggleAccountConsent(
-                          acc.id,
-                          !acc.isAuthorized,
-                        )
-                      }
-                      className="ml-auto text-[11px] text-[#8baba6] underline hover:text-white"
-                    >
-                      {acc.isAuthorized ? 'Revogar acesso' : 'Autorizar'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Módulo PIX Asaas */}
-          <div className="lg:col-span-5 rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="font-heading text-base text-white">
-                  Conta Digital &amp; PIX Asaas
-                </h2>
-                <p className="text-xs text-[#8baba6]">
-                  Gere QR Code PIX de cobrança ou transfira com validação exaustiva.
-                </p>
-              </div>
-              <QrCode className="h-5 w-5 text-[#0df0b2]" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 rounded-xl bg-black p-1 border border-[#185054]/60 mb-4">
-              <button
-                type="button"
-                onClick={() => setPixTab('CHARGE')}
-                className={`rounded-lg py-2 text-xs font-semibold transition-all ${
-                  pixTab === 'CHARGE'
-                    ? 'bg-[#185054] text-[#0df0b2]'
-                    : 'text-[#8baba6] hover:text-white'
-                }`}
-              >
-                Receber (QR Code PIX)
-              </button>
-              <button
-                type="button"
-                onClick={() => setPixTab('TRANSFER')}
-                className={`rounded-lg py-2 text-xs font-semibold transition-all ${
-                  pixTab === 'TRANSFER'
-                    ? 'bg-[#185054] text-[#0df0b2]'
-                    : 'text-[#8baba6] hover:text-white'
-                }`}
-              >
-                Enviar PIX
-              </button>
-            </div>
-
-            {pixTab === 'CHARGE' ? (
-              <form onSubmit={(e) => void handleCreatePixCharge(e)} className="space-y-3">
-                <div>
-                  <label className="block text-xs text-[#b6c8c6] mb-1">
-                    Valor da Cobrança (R$)
-                  </label>
-                  <input
-                    type="text"
-                    value={chargeAmount}
-                    onChange={(e) => setChargeAmount(e.target.value)}
-                    className="w-full rounded-xl border border-[#185054] bg-black px-3.5 py-2 text-sm text-white focus:border-[#0df0b2] focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-[#b6c8c6] mb-1">
-                    Descrição da Cobrança
-                  </label>
-                  <input
-                    type="text"
-                    value={chargeDesc}
-                    onChange={(e) => setChargeDesc(e.target.value)}
-                    className="w-full rounded-xl border border-[#185054] bg-black px-3.5 py-2 text-sm text-white focus:border-[#0df0b2] focus:outline-none"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full rounded-xl bg-[#0df0b2] py-2.5 text-xs font-bold tracking-wider text-black hover:bg-white transition-all"
-                >
-                  GERAR QR CODE PIX ({state.activeFlavor})
-                </button>
-
-                {state.activePixCharge && (
-                  <div className="mt-4 rounded-xl border border-[#0df0b2]/40 bg-black/80 p-3.5 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-[#0df0b2] font-semibold">
-                        QR Code Ativo ({state.activePixCharge.provider})
-                      </span>
-                      <span className="text-[#859a9b]">
-                        R$ {state.activePixCharge.amount.toFixed(2)}
-                      </span>
-                    </div>
-                    <p className="font-mono text-[11px] break-all text-[#b6c8c6] bg-[#0a1416] p-2 rounded border border-[#185054]/50">
-                      {state.activePixCharge.qrPayload[0]}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (typeof navigator !== 'undefined' && state.activePixCharge) {
-                          void navigator.clipboard.writeText(
-                            state.activePixCharge.qrPayload[0],
-                          );
-                          setCopiedQr(true);
-                          setTimeout(() => setCopiedQr(false), 2000);
-                        }
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs text-[#0df0b2] hover:underline"
-                    >
-                      {copiedQr ? (
-                        <>
-                          <Check className="h-3.5 w-3.5" /> Código PIX copiado!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" /> Copiar PIX Copia e Cola
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </form>
-            ) : (
-              <form
-                onSubmit={(e) => void handleExecutePixTransfer(e)}
-                className="space-y-3"
-              >
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-xs text-[#b6c8c6] mb-1">
-                      Tipo de Chave
-                    </label>
-                    <select
-                      value={transferKeyType}
-                      onChange={(e) =>
-                        setTransferKeyType(e.target.value as PixKeyType)
-                      }
-                      className="w-full rounded-xl border border-[#185054] bg-black px-3 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                    >
-                      <option value="EMAIL">E-mail</option>
-                      <option value="CPF">CPF</option>
-                      <option value="PHONE">Celular</option>
-                      <option value="RANDOM">Chave Aleatória</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-[#b6c8c6] mb-1">
-                      Valor (R$)
-                    </label>
-                    <input
-                      type="text"
-                      value={transferAmount}
-                      onChange={(e) => setTransferAmount(e.target.value)}
-                      className="w-full rounded-xl border border-[#185054] bg-black px-3 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-[#b6c8c6] mb-1">
-                    Chave PIX de Destino
-                  </label>
-                  <input
-                    type="text"
-                    value={transferKey}
-                    onChange={(e) => setTransferKey(e.target.value)}
-                    placeholder="Ex: contato@eximiatech.com.br ou 123.456.789-00"
-                    className="w-full rounded-xl border border-[#185054] bg-black px-3.5 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-[#b6c8c6] mb-1">
-                    Favorecido
-                  </label>
-                  <input
-                    type="text"
-                    value={transferRecipient}
-                    onChange={(e) => setTransferRecipient(e.target.value)}
-                    className="w-full rounded-xl border border-[#185054] bg-black px-3.5 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full rounded-xl bg-[#0df0b2] py-2.5 text-xs font-bold tracking-wider text-black hover:bg-white transition-all"
-                >
-                  LIQUIDAR TRANSFERÊNCIA PIX
-                </button>
-              </form>
-            )}
           </div>
         </section>
 
-        {/* PIERRE AI INSIGHTS & CONVERSATIONAL ASSISTANT */}
-        {summary && (
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Insights de Gastos e Tuplas de Orçamento */}
-            <div className="lg:col-span-6 rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-heading text-base text-white">
-                    Diagnóstico de Gastos &amp; Anomalias (Pierre Engine)
-                  </h2>
-                  <p className="text-xs text-[#8baba6]">
-                    Comparação automática com a tupla{' '}
-                    <code>BudgetThresholdTuple [metaIdeal, tetoAlerta]</code>.
-                  </p>
-                </div>
-              </div>
+        {/* FEEDBACK DISCRETO */}
+        {(state.errorMessage || state.feedbackBanner) && (
+          <div className="rounded-2xl nexo-card border-[#ff5500]/40 p-4 flex items-center justify-between gap-3 text-xs">
+            <span className="font-medium">
+              {state.errorMessage ?? state.feedbackBanner}
+            </span>
+            <button
+              type="button"
+              onClick={() => viewModel.clearNotices()}
+              className="nexo-text-muted hover:opacity-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
-              <div className="space-y-3">
-                {summary.insights.map((insight) => (
-                  <div
-                    key={insight.id}
-                    className={`rounded-xl border p-3.5 ${
-                      insight.severity === 'CRITICAL'
-                        ? 'border-[#ef5000]/60 bg-[#ef5000]/10'
-                        : insight.severity === 'WARNING'
-                          ? 'border-amber-500/40 bg-amber-500/10'
-                          : 'border-[#185054] bg-black/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-xs font-bold text-white">
-                        {insight.title}
-                      </span>
-                      <span
-                        className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
-                          insight.severity === 'CRITICAL'
-                            ? 'bg-[#ef5000] text-white'
-                            : insight.severity === 'WARNING'
-                              ? 'bg-amber-400 text-black'
-                              : 'bg-[#0df0b2]/20 text-[#0df0b2]'
-                        }`}
-                      >
-                        {insight.severity}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#d9d9d9] mb-1.5">
-                      {insight.description}
-                    </p>
-                    <p className="text-[11px] text-[#0df0b2]">
-                      Recomendação: {insight.actionRecommendation}
-                    </p>
-                  </div>
-                ))}
+        {/* CARTÃO PRINCIPAL DE SALDO — Minimalista Preto/Branco + Detalhe Laranja */}
+        <section className="rounded-3xl nexo-card p-6 sm:p-8 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+            <div>
+              <span className="text-xs uppercase tracking-[0.18em] nexo-text-muted block mb-2">
+                Saldo Consolidado Open Finance
+              </span>
+              <div className="font-heading text-3xl sm:text-4xl tracking-tight">
+                {summary
+                  ? formatCurrency(summary.consolidatedBalance, hideBalances)
+                  : 'R$ 0,00'}
               </div>
             </div>
 
-            {/* Chat Interativo Pierre AI */}
-            <div className="lg:col-span-6 rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-6 flex flex-col justify-between">
+            <div className="flex items-center gap-6 text-xs">
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#004fff]/20 border border-[#004fff]/50 text-[#0df0b2]">
-                      <Bot className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h2 className="font-heading text-sm text-white">
-                        Converse com seu Dinheiro (Nexo IA)
-                      </h2>
-                      <span className="text-[11px] text-[#8baba6]">
-                        Inspirado na experiência conversacional do Pierre Finance
+                <span className="nexo-text-muted block mb-0.5">Entradas</span>
+                <span className="font-semibold">
+                  {summary
+                    ? formatCurrency(summary.totalIncomeMonth, hideBalances)
+                    : 'R$ 0,00'}
+                </span>
+              </div>
+              <div className="h-7 w-px bg-[var(--border-subtle)]" />
+              <div>
+                <span className="nexo-text-muted block mb-0.5">Saídas</span>
+                <span className="font-semibold">
+                  {summary
+                    ? formatCurrency(summary.totalExpensesMonth, hideBalances)
+                    : 'R$ 0,00'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Alerta discreto caso o motor detecte cobrança duplicada */}
+          {summary && summary.insights.length > 0 && (
+            <button
+              type="button"
+              onClick={() => openWizard('assistant')}
+              className="mt-6 w-full rounded-2xl nexo-elevated px-4 py-3 flex items-center justify-between gap-3 text-left transition-colors hover:border-[#ff5500]/50"
+            >
+              <div className="flex items-center gap-2.5 text-xs">
+                <span className="h-2 w-2 rounded-full bg-[#ff5500] shrink-0" />
+                <span className="font-medium">{summary.insights[0]?.title}</span>
+              </div>
+              <span className="text-[11px] text-[#ff5500] font-medium shrink-0">
+                Ver detalhes →
+              </span>
+            </button>
+          )}
+        </section>
+
+        {/* AÇÕES RÁPIDAS CIRCULARES ESTILO NUBANK (Abrem Wizards Passo a Passo) */}
+        <section>
+          <div className="grid grid-cols-5 gap-2 sm:gap-4">
+            {[
+              {
+                id: 'transfer_pix' as const,
+                label: 'Transferir Pix',
+                icon: Send,
+              },
+              {
+                id: 'charge_pix' as const,
+                label: 'Cobrar QR',
+                icon: QrCode,
+              },
+              {
+                id: 'new_transaction' as const,
+                label: 'Novo Gasto',
+                icon: Plus,
+              },
+              {
+                id: 'open_finance' as const,
+                label: 'Meus Bancos',
+                icon: Building2,
+              },
+              {
+                id: 'assistant' as const,
+                label: 'Assistente',
+                icon: Sparkles,
+              },
+            ].map((action) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.id}
+                  type="button"
+                  onClick={() => openWizard(action.id)}
+                  className="group flex flex-col items-center gap-2.5 text-center"
+                >
+                  <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full nexo-card transition-all group-hover:border-[#ff5500] group-hover:scale-105">
+                    <Icon className="h-5 w-5 transition-colors group-hover:text-[#ff5500]" />
+                  </div>
+                  <span className="text-[11px] sm:text-xs font-medium nexo-text-secondary group-hover:text-[var(--text-primary)]">
+                    {action.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* CONTAS CONECTADAS (Resumo Limpo) */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading text-sm tracking-wide">
+              Contas Conectadas
+            </h2>
+            <button
+              type="button"
+              onClick={() => openWizard('open_finance')}
+              className="text-xs text-[#ff5500] hover:underline"
+            >
+              Gerenciar conexões
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {state.accounts.map((acc) => (
+              <button
+                key={acc.id}
+                type="button"
+                onClick={() => {
+                  setSelectedBankId(acc.id);
+                  openWizard('open_finance');
+                }}
+                className="rounded-2xl nexo-card p-4 flex items-center justify-between text-left transition-colors hover:border-[#ff5500]/50"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{acc.nickname}</span>
+                    {!acc.isAuthorized && (
+                      <span className="text-[10px] text-[#ff5500]">
+                        Pausado
                       </span>
-                    </div>
+                    )}
+                  </div>
+                  <span className="text-xs nexo-text-muted">
+                    {getInstitutionDisplayName(acc.institution)}
+                  </span>
+                </div>
+                <span className="font-heading text-sm">
+                  {formatCurrency(acc.balance, hideBalances)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* HISTÓRICO DE MOVIMENTAÇÕES */}
+        <section className="rounded-3xl nexo-card p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 className="font-heading text-sm tracking-wide">Histórico</h2>
+
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="h-3.5 w-3.5 nexo-text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchText}
+                onChange={(e) => {
+                  const q = e.target.value;
+                  setSearchText(q);
+                  void viewModel.filterTransactions({
+                    query: q,
+                    category: activeCategory,
+                  });
+                }}
+                placeholder="Buscar lançamento..."
+                className="w-full rounded-full nexo-elevated pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-[#ff5500]"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                { id: 'ALL', label: 'Todos' },
+                { id: TransactionCategory.PIX, label: 'PIX' },
+                { id: TransactionCategory.SUBSCRIPTIONS, label: 'Assinaturas' },
+                { id: TransactionCategory.FOOD, label: 'Alimentação' },
+                { id: TransactionCategory.SALARY, label: 'Entradas' },
+              ] as const
+            ).map((cat) => {
+              const selected = activeCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveCategory(cat.id);
+                    void viewModel.filterTransactions({
+                      query: searchText,
+                      category: cat.id,
+                    });
+                  }}
+                  className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
+                    selected
+                      ? 'bg-[#ff5500] text-white'
+                      : 'nexo-elevated nexo-text-secondary'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {state.filteredTransactions.map((tx) => (
+              <div
+                key={tx.id}
+                className="py-3.5 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full nexo-elevated">
+                    {tx.isIncome ? (
+                      <ArrowDownLeft className="h-4 w-4 text-[#ff5500]" />
+                    ) : (
+                      <ArrowUpRight className="h-4 w-4 nexo-text-secondary" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{tx.title}</p>
+                    <p className="text-xs nexo-text-muted">
+                      {getInstitutionDisplayName(tx.institution)} •{' '}
+                      {tx.categoryLabel} • {tx.dateIso}
+                    </p>
                   </div>
                 </div>
 
-                {/* Quick prompts */}
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {QUICK_PROMPTS.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => viewModel.askAssistant(prompt)}
-                      className="rounded-full border border-[#185054] bg-black px-3 py-1 text-[11px] text-[#b6c8c6] hover:border-[#0df0b2] hover:text-[#0df0b2] transition-colors"
-                    >
-                      {prompt}
-                    </button>
+                <span
+                  className={`font-heading text-xs sm:text-sm shrink-0 ${
+                    tx.isIncome ? 'text-[#ff5500]' : ''
+                  }`}
+                >
+                  {tx.isIncome ? '+' : '-'}
+                  {formatCurrency(tx.amount, hideBalances)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {!authUser && (
+          <div className="text-center pt-2">
+            <Link
+              href="/login"
+              className="text-xs nexo-text-secondary hover:text-[#ff5500] transition-colors"
+            >
+              Deseja salvar seus lançamentos no Cloud Firestore? Entre na sua
+              conta →
+            </Link>
+          </div>
+        )}
+      </main>
+
+      {/* =====================================================================
+          MODAL WIZARD PASSO A PASSO ESTILO NUBANK
+         ===================================================================== */}
+      {activeWizard && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 backdrop-blur-sm p-0 sm:p-4">
+          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl nexo-card p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            {/* Cabeçalho do Wizard */}
+            <div className="flex items-center justify-between mb-6">
+              {wizardStep > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setWizardStep((s) => s - 1)}
+                  className="inline-flex items-center gap-1 text-xs nexo-text-secondary hover:text-[#ff5500]"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Voltar</span>
+                </button>
+              ) : (
+                <span className="text-xs font-medium text-[#ff5500] uppercase tracking-wider">
+                  Fluxo Guiado
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={closeWizard}
+                className="flex h-8 w-8 items-center justify-center rounded-full nexo-elevated nexo-text-secondary hover:text-[#ff5500]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* WIZARD 1: TRANSFERIR PIX (3 PASSOS) */}
+            {activeWizard === 'transfer_pix' && (
+              <div className="space-y-6">
+                <div className="flex gap-1.5">
+                  {[1, 2, 3].map((s) => (
+                    <span
+                      key={s}
+                      className={`h-1 flex-1 rounded-full ${
+                        wizardStep >= s
+                          ? 'bg-[#ff5500]'
+                          : 'bg-[var(--border-subtle)]'
+                      }`}
+                    />
                   ))}
                 </div>
 
-                {/* Messages */}
-                <div className="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
+                {wizardStep === 1 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="font-heading text-xl mb-1">
+                        Qual é o valor da transferência?
+                      </h3>
+                      <p className="text-xs nexo-text-secondary">
+                        Saldo disponível na conta Asaas:{' '}
+                        {formatCurrency(
+                          state.accounts.find(
+                            (a) => a.institution === InstitutionCode.ASAAS,
+                          )?.balance ?? 0,
+                        )}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-2">
+                        Valor em R$
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        autoFocus
+                        value={pixTransferAmount}
+                        onChange={(e) => setPixTransferAmount(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-4 font-heading text-2xl focus:outline-none focus:border-[#ff5500]"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(2)}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                    >
+                      Continuar
+                    </button>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="font-heading text-xl mb-1">
+                        Para quem você quer enviar{' '}
+                        {formatCurrency(Number(pixTransferAmount) || 0)}?
+                      </h3>
+                      <p className="text-xs nexo-text-secondary">
+                        Selecione o tipo de chave e informe os dados do
+                        destinatário.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {(['CPF', 'EMAIL', 'PHONE', 'RANDOM'] as const).map(
+                        (t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setPixKeyType(t)}
+                            className={`rounded-xl py-2 text-xs font-medium ${
+                              pixKeyType === t
+                                ? 'bg-[#ff5500] text-white'
+                                : 'nexo-elevated nexo-text-secondary'
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ),
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1.5">
+                        Chave PIX ({pixKeyType})
+                      </label>
+                      <input
+                        type="text"
+                        value={pixKeyValue}
+                        onChange={(e) => setPixKeyValue(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm focus:outline-none focus:border-[#ff5500]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1.5">
+                        Nome do favorecido
+                      </label>
+                      <input
+                        type="text"
+                        value={pixRecipientName}
+                        onChange={(e) => setPixRecipientName(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm focus:outline-none focus:border-[#ff5500]"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setWizardStep(3)}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                    >
+                      Revisar transferência
+                    </button>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="font-heading text-xl mb-1">
+                        Confirme os dados
+                      </h3>
+                      <p className="text-xs nexo-text-secondary">
+                        Verifique as informações antes de enviar o PIX.
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl nexo-elevated p-4 space-y-3 text-xs">
+                      <div className="flex justify-between">
+                        <span className="nexo-text-muted">Valor</span>
+                        <span className="font-heading text-sm text-[#ff5500]">
+                          {formatCurrency(Number(pixTransferAmount) || 0)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="nexo-text-muted">Para</span>
+                        <span className="font-medium">{pixRecipientName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="nexo-text-muted">
+                          Chave ({pixKeyType})
+                        </span>
+                        <span className="font-mono">{pixKeyValue}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleConfirmPixTransfer()}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                    >
+                      Confirmar e enviar PIX
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WIZARD 2: COBRAR VIA QR CODE PIX (2 PASSOS) */}
+            {activeWizard === 'charge_pix' && (
+              <div className="space-y-6">
+                <div className="flex gap-1.5">
+                  {[1, 2].map((s) => (
+                    <span
+                      key={s}
+                      className={`h-1 flex-1 rounded-full ${
+                        wizardStep >= s
+                          ? 'bg-[#ff5500]'
+                          : 'bg-[var(--border-subtle)]'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {wizardStep === 1 ? (
+                  <form
+                    onSubmit={(e) => void handleGeneratePixQr(e)}
+                    className="space-y-5"
+                  >
+                    <div>
+                      <h3 className="font-heading text-xl mb-1">
+                        Qual valor você quer receber?
+                      </h3>
+                      <p className="text-xs nexo-text-secondary">
+                        Gere um QR Code PIX imediato pela conta Asaas.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1.5">
+                        Valor da cobrança (R$)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        required
+                        value={pixChargeAmount}
+                        onChange={(e) => setPixChargeAmount(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-4 font-heading text-2xl focus:outline-none focus:border-[#ff5500]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1.5">
+                        Descrição
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={pixChargeDesc}
+                        onChange={(e) => setPixChargeDesc(e.target.value)}
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm focus:outline-none focus:border-[#ff5500]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                    >
+                      Gerar QR Code PIX
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="font-heading text-xl mb-1">
+                        Cobrança PIX pronta
+                      </h3>
+                      <p className="text-xs nexo-text-secondary">
+                        Compartilhe o código Copia e Cola abaixo.
+                      </p>
+                    </div>
+
+                    {state.activePixCharge && (
+                      <div className="rounded-2xl nexo-elevated p-4 space-y-3">
+                        <div className="flex justify-between text-xs">
+                          <span className="nexo-text-muted">Valor</span>
+                          <span className="font-heading text-[#ff5500]">
+                            {formatCurrency(state.activePixCharge.amount)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-mono break-all nexo-text-secondary bg-black/20 p-3 rounded-xl">
+                          {state.activePixCharge.qrPayload[0]}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleCopyQrPayload(
+                              state.activePixCharge!.qrPayload[0],
+                            )
+                          }
+                          className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#ff5500] py-3 text-xs font-medium text-white"
+                        >
+                          {copiedQr ? (
+                            <>
+                              <Check className="h-4 w-4" />
+                              <span>Copiado!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4" />
+                              <span>Copiar código PIX</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WIZARD 3: NOVO LANÇAMENTO (3 PASSOS) */}
+            {activeWizard === 'new_transaction' && (
+              <div className="space-y-6">
+                <div className="flex gap-1.5">
+                  {[1, 2, 3].map((s) => (
+                    <span
+                      key={s}
+                      className={`h-1 flex-1 rounded-full ${
+                        wizardStep >= s
+                          ? 'bg-[#ff5500]'
+                          : 'bg-[var(--border-subtle)]'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {wizardStep === 1 && (
+                  <div className="space-y-4">
+                    <h3 className="font-heading text-xl">
+                      Qual o tipo de registro?
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTxType('EXPENSE');
+                          setWizardStep(2);
+                        }}
+                        className="rounded-2xl nexo-elevated p-5 text-left hover:border-[#ff5500] transition-colors"
+                      >
+                        <ArrowUpRight className="h-5 w-5 text-[#ff5500] mb-3" />
+                        <span className="font-heading text-sm block mb-1">
+                          Saída
+                        </span>
+                        <span className="text-xs nexo-text-muted">
+                          Gasto, compra ou assinatura
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTxType('INCOME');
+                          setWizardStep(2);
+                        }}
+                        className="rounded-2xl nexo-elevated p-5 text-left hover:border-[#ff5500] transition-colors"
+                      >
+                        <ArrowDownLeft className="h-5 w-5 text-[#ff5500] mb-3" />
+                        <span className="font-heading text-sm block mb-1">
+                          Entrada
+                        </span>
+                        <span className="text-xs nexo-text-muted">
+                          Receita, salário ou recebimento
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-5">
+                    <h3 className="font-heading text-xl">
+                      Valor e identificação
+                    </h3>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1.5">
+                        Valor (R$)
+                      </label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        autoFocus
+                        value={txAmount}
+                        onChange={(e) => setTxAmount(e.target.value)}
+                        placeholder="0,00"
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3.5 font-heading text-xl focus:outline-none focus:border-[#ff5500]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1.5">
+                        Descrição
+                      </label>
+                      <input
+                        type="text"
+                        value={txTitle}
+                        onChange={(e) => setTxTitle(e.target.value)}
+                        placeholder="Ex.: Jantar, Supermercado, Projeto..."
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm focus:outline-none focus:border-[#ff5500]"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (Number(txAmount) > 0 && txTitle.trim().length >= 2) {
+                          setWizardStep(3);
+                        }
+                      }}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                    >
+                      Continuar
+                    </button>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-5">
+                    <h3 className="font-heading text-xl">
+                      Categoria e instituição
+                    </h3>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1.5">
+                        Categoria
+                      </label>
+                      <select
+                        value={txCategory}
+                        onChange={(e) =>
+                          setTxCategory(e.target.value as TransactionCategory)
+                        }
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      >
+                        {Object.values(TransactionCategory).map((c) => (
+                          <option key={c} value={c}>
+                            {getCategoryLabel(c)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs nexo-text-muted mb-1.5">
+                        Instituição
+                      </label>
+                      <select
+                        value={txInstitution}
+                        onChange={(e) =>
+                          setTxInstitution(e.target.value as InstitutionCode)
+                        }
+                        className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
+                      >
+                        {Object.values(InstitutionCode).map((inst) => (
+                          <option key={inst} value={inst}>
+                            {getInstitutionDisplayName(inst)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleCreateTransaction()}
+                      className="w-full rounded-full bg-[#ff5500] py-3.5 text-sm font-medium text-white"
+                    >
+                      Confirmar lançamento
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* WIZARD 4: OPEN FINANCE (2 PASSOS) */}
+            {activeWizard === 'open_finance' && (
+              <div className="space-y-5">
+                {wizardStep === 1 ? (
+                  <>
+                    <div>
+                      <h3 className="font-heading text-xl mb-1">
+                        Conexões Open Finance
+                      </h3>
+                      <p className="text-xs nexo-text-secondary">
+                        Toque em uma instituição para sincronizar ou gerenciar o
+                        consentimento.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {state.accounts.map((acc) => (
+                        <button
+                          key={acc.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedBankId(acc.id);
+                            setWizardStep(2);
+                          }}
+                          className="w-full rounded-2xl nexo-elevated p-4 flex items-center justify-between text-left hover:border-[#ff5500]"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{acc.nickname}</p>
+                            <p className="text-xs nexo-text-muted">
+                              {acc.formattedCoordinates}
+                            </p>
+                          </div>
+                          <span className="font-heading text-xs">
+                            {formatCurrency(acc.balance)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  selectedBank && (
+                    <div className="space-y-5">
+                      <div>
+                        <h3 className="font-heading text-xl mb-1">
+                          {selectedBank.nickname}
+                        </h3>
+                        <p className="text-xs nexo-text-muted">
+                          {selectedBank.formattedCoordinates}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl nexo-elevated p-4 flex justify-between items-center">
+                        <span className="text-xs nexo-text-secondary">
+                          Saldo atual
+                        </span>
+                        <span className="font-heading text-lg">
+                          {formatCurrency(selectedBank.balance)}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void viewModel.syncInstitution(
+                              selectedBank.institution,
+                            );
+                            closeWizard();
+                          }}
+                          className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-[#ff5500] py-3.5 text-xs font-medium text-white"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          <span>Sincronizar agora via Open Finance</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void viewModel.toggleAccountConsent(
+                              selectedBank.id,
+                              !selectedBank.isAuthorized,
+                            );
+                            closeWizard();
+                          }}
+                          className="w-full rounded-full nexo-elevated py-3 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
+                        >
+                          {selectedBank.isAuthorized
+                            ? 'Revogar consentimento Open Finance'
+                            : 'Reautorizar compartilhamento'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {/* WIZARD 5: ASSISTENTE FINANCEIRO & AUDITORIA */}
+            {activeWizard === 'assistant' && (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="font-heading text-xl mb-1">
+                    Assistente Nexo
+                  </h3>
+                  <p className="text-xs nexo-text-secondary">
+                    Análise automática de assinaturas, tetos de gastos e dúvidas
+                    rápidas.
+                  </p>
+                </div>
+
+                {summary && summary.insights.length > 0 && (
+                  <div className="space-y-2">
+                    {summary.insights.map((ins) => (
+                      <div
+                        key={ins.id}
+                        className="rounded-2xl nexo-elevated p-3.5 text-xs space-y-1"
+                      >
+                        <div className="flex items-center justify-between font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5 text-[#ff5500]" />
+                            {ins.title}
+                          </span>
+                        </div>
+                        <p className="nexo-text-secondary leading-relaxed">
+                          {ins.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1">
                   {state.assistantHistory.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`rounded-xl p-3 text-xs leading-relaxed ${
+                      className={`rounded-2xl p-3 text-xs leading-relaxed ${
                         msg.sender === 'USER'
-                          ? 'ml-8 bg-[#185054]/60 text-white border border-[#0df0b2]/30'
-                          : 'mr-4 bg-black/80 text-[#d9d9d9] border border-[#185054]/70'
+                          ? 'bg-[#ff5500] text-white ml-8'
+                          : 'nexo-elevated mr-4'
                       }`}
                     >
-                      <span className="block text-[10px] font-semibold uppercase tracking-wider text-[#0df0b2] mb-1">
-                        {msg.sender === 'USER' ? 'Você' : 'Nexo IA • Pierre Engine'}
-                      </span>
                       {msg.text}
                     </div>
                   ))}
                 </div>
-              </div>
 
-              <form onSubmit={handleSendChat} className="flex gap-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Pergunte sobre assinaturas, duplicidades, saldo ou gastos..."
-                  className="flex-1 rounded-xl border border-[#185054] bg-black px-3.5 py-2.5 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#0df0b2] px-4 py-2.5 text-xs font-bold text-black hover:bg-white transition-all"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  Enviar
-                </button>
-              </form>
-            </div>
-          </section>
-        )}
-
-        {/* EXTRATO CONSOLIDADO & FORMULÁRIO DE NOVO LANÇAMENTO */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Lista de Transações */}
-          <div className="lg:col-span-8 rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="font-heading text-base text-white">
-                  Extrato Unificado Open Finance
-                </h2>
-                <p className="text-xs text-[#8baba6]">
-                  Pesquisa reativa via <code>SearchTransactionsUseCase</code> (inspirado no{' '}
-                  <code>SearchMedia</code> do <code>App_Nasa</code>).
-                </p>
-              </div>
-              <span className="text-xs text-[#0df0b2] font-mono">
-                {state.filteredTransactions.length} lançamento(s)
-              </span>
-            </div>
-
-            {/* Filtros */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div className="relative">
-                <Search className="h-3.5 w-3.5 text-[#859a9b] absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) =>
-                    handleFilterChange(
-                      e.target.value,
-                      selectedCategory,
-                      selectedInstitution,
-                    )
-                  }
-                  placeholder="Buscar título, loja ou data..."
-                  className="w-full rounded-xl border border-[#185054] bg-black pl-8 pr-3 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                />
-              </div>
-
-              <div className="relative">
-                <Filter className="h-3.5 w-3.5 text-[#859a9b] absolute left-3 top-1/2 -translate-y-1/2" />
-                <select
-                  value={selectedCategory}
-                  onChange={(e) =>
-                    handleFilterChange(
-                      searchQuery,
-                      e.target.value as TransactionCategory | 'ALL',
-                      selectedInstitution,
-                    )
-                  }
-                  className="w-full rounded-xl border border-[#185054] bg-black pl-8 pr-3 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                >
-                  <option value="ALL">Todas as Categorias</option>
-                  {Object.values(TransactionCategory).map((cat) => (
-                    <option key={cat} value={cat}>
-                      {getCategoryLabel(cat)}
-                    </option>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'Qual meu saldo total?',
+                    'Tem cobrança duplicada?',
+                    'Quanto gastei com assinaturas?',
+                  ].map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => viewModel.askAssistant(q)}
+                      className="rounded-full nexo-elevated px-3 py-1 text-[11px] nexo-text-secondary hover:text-[#ff5500]"
+                    >
+                      {q}
+                    </button>
                   ))}
-                </select>
-              </div>
-
-              <select
-                value={selectedInstitution}
-                onChange={(e) =>
-                  handleFilterChange(
-                    searchQuery,
-                    selectedCategory,
-                    e.target.value as InstitutionCode | 'ALL',
-                  )
-                }
-                className="w-full rounded-xl border border-[#185054] bg-black px-3 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-              >
-                <option value="ALL">Todos os Bancos</option>
-                {Object.values(InstitutionCode).map((inst) => (
-                  <option key={inst} value={inst}>
-                    {inst}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Tabela de lançamentos */}
-            <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
-              {state.filteredTransactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between rounded-xl border border-[#185054]/50 bg-black/60 px-4 py-3 hover:border-[#0df0b2]/40 transition-colors"
-                >
-                  <div className="min-w-0 pr-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs sm:text-sm font-semibold text-white truncate">
-                        {tx.title}
-                      </span>
-                      {tx.isRecurring && (
-                        <span className="rounded bg-[#185054]/60 px-1.5 py-0.5 text-[10px] text-[#0df0b2]">
-                          Recorrente
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#859a9b] mt-0.5">
-                      <span>{tx.institution}</span>
-                      <span>•</span>
-                      <span>{tx.categoryLabel}</span>
-                      <span>•</span>
-                      <span>{tx.dateIso}</span>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`font-heading text-xs sm:text-sm shrink-0 ${
-                      tx.isIncome ? 'text-[#0df0b2]' : 'text-white'
-                    }`}
-                  >
-                    {tx.isIncome ? '+' : '-'} R${' '}
-                    {tx.amount.toLocaleString('pt-BR', {
-                      minimumFractionDigits: 2,
-                    })}
-                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Novo Lançamento Manual */}
-          <div className="lg:col-span-4 rounded-2xl border border-[#185054]/70 bg-[#0a1416] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="font-heading text-base text-white">
-                  Novo Lançamento Tipado
-                </h2>
-                <p className="text-xs text-[#8baba6]">
-                  Validado por <code>Transaction.validateProps()</code> retornando{' '}
-                  <code>Either&lt;Failure, Transaction&gt;</code>.
-                </p>
-              </div>
-              <Plus className="h-5 w-5 text-[#0df0b2]" />
-            </div>
-
-            <form
-              onSubmit={(e) => void handleAddTransaction(e)}
-              className="space-y-3"
-            >
-              <div>
-                <label className="block text-xs text-[#b6c8c6] mb-1">
-                  Descrição
-                </label>
-                <input
-                  type="text"
-                  value={newTxTitle}
-                  onChange={(e) => setNewTxTitle(e.target.value)}
-                  placeholder="Ex: Licença JetBrains / Recebimento Cliente"
-                  className="w-full rounded-xl border border-[#185054] bg-black px-3.5 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs text-[#b6c8c6] mb-1">
-                    Valor (R$)
-                  </label>
+                <form
+                  onSubmit={handleAskAssistant}
+                  className="flex items-center gap-2"
+                >
                   <input
                     type="text"
-                    value={newTxAmount}
-                    onChange={(e) => setNewTxAmount(e.target.value)}
-                    placeholder="250.00"
-                    className="w-full rounded-xl border border-[#185054] bg-black px-3 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Pergunte sobre suas finanças..."
+                    className="flex-1 rounded-full nexo-elevated px-4 py-2.5 text-xs focus:outline-none focus:border-[#ff5500]"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs text-[#b6c8c6] mb-1">
-                    Natureza
-                  </label>
-                  <select
-                    value={newTxType}
-                    onChange={(e) =>
-                      setNewTxType(e.target.value as TransactionType)
-                    }
-                    className="w-full rounded-xl border border-[#185054] bg-black px-3 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
+                  <button
+                    type="submit"
+                    className="rounded-full bg-[#ff5500] px-4 py-2.5 text-xs font-medium text-white"
                   >
-                    <option value="EXPENSE">Despesa</option>
-                    <option value="INCOME">Receita</option>
-                  </select>
-                </div>
+                    Enviar
+                  </button>
+                </form>
               </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs text-[#b6c8c6] mb-1">
-                    Categoria (Enum)
-                  </label>
-                  <select
-                    value={newTxCategory}
-                    onChange={(e) =>
-                      setNewTxCategory(e.target.value as TransactionCategory)
-                    }
-                    className="w-full rounded-xl border border-[#185054] bg-black px-3 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                  >
-                    {Object.values(TransactionCategory).map((c) => (
-                      <option key={c} value={c}>
-                        {getCategoryLabel(c)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-[#b6c8c6] mb-1">
-                    Instituição (Enum)
-                  </label>
-                  <select
-                    value={newTxInstitution}
-                    onChange={(e) =>
-                      setNewTxInstitution(e.target.value as InstitutionCode)
-                    }
-                    className="w-full rounded-xl border border-[#185054] bg-black px-3 py-2 text-xs text-white focus:border-[#0df0b2] focus:outline-none"
-                  >
-                    {Object.values(InstitutionCode).map((inst) => (
-                      <option key={inst} value={inst}>
-                        {inst}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-[#185054] py-2.5 text-xs font-bold tracking-wider text-white hover:bg-[#0df0b2] hover:text-black transition-all"
-              >
-                REGISTRAR LANÇAMENTO
-              </button>
-            </form>
+            )}
           </div>
-        </section>
-      </main>
+        </div>
+      )}
     </div>
   );
 }
