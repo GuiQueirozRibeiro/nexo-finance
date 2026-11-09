@@ -1,5 +1,8 @@
 # Nexo Finance — by Exímia Tech
 
+- **Aplicação Web (Produção Vercel / Exímia Tech):** [https://nexo.eximiatech.com.br](https://nexo.eximiatech.com.br)
+- **Repositório GitHub:** [https://github.com/GuiQueirozRibeiro/nexo-finance](https://github.com/GuiQueirozRibeiro/nexo-finance)
+
 Plataforma de **Controle Financeiro Inteligente**, **Open Finance** (inspirada no *Pierre Finance*) e **Conta Digital PIX (Asaas)**, construída para o Projeto de Disciplina de **TypeScript para Desenvolvimento Front-end [26E4_2]** (Instituto Infnet).
 
 O projeto aplica **Clean Architecture (3 camadas + Core)**, **Princípios SOLID**, **MVVM** e **Flavors de Ambiente (`DEV` / `PROD`)** inspirados na arquitetura do projeto [`App_Nasa`](../App_Nasa/README.md).
@@ -50,6 +53,6 @@ npm run dev          # Inicia servidor de desenvolvimento Next.js
 npm run typecheck    # Verificação estática de tipos (tsc --noEmit)
 npm run build:core   # Transpila a arquitetura TS pura para dist-core/ com Source Maps (.js.map)
 npm run lint         # Executa ESLint estrito (zero any)
-npm test             # Executa suíte de 15 testes unitários (Vitest)
+npm test             # Executa suíte de 17 testes unitários (Vitest)
 npm run build        # Build de produção Next.js
 ```

@@ -4,6 +4,8 @@
 **Professor:** Kennedy Carvalho
 **Disciplina:** TypeScript para Desenvolvimento Front-end [26E4_2]
 **Data:** 09/11/2026
+**Deploy (Vercel / Exímia Tech):** [https://nexo.eximiatech.com.br](https://nexo.eximiatech.com.br)
+**Repositório GitHub:** [https://github.com/GuiQueirozRibeiro/nexo-finance](https://github.com/GuiQueirozRibeiro/nexo-finance)
 
 ## 1. Visão Geral e Domínio do Projeto
 
