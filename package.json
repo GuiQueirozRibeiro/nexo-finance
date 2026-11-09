@@ -1,0 +1,41 @@
+{
+  "name": "nexo-finance",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Nexo Finance by Exímia Tech — Controle Financeiro Inteligente com Open Finance, Assistente IA (estilo Pierre) e Banco Digital PIX Asaas em Clean Architecture + SOLID + TypeScript Estrito",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "build:core": "tsc -p tsconfig.build.core.json",
+    "typecheck": "tsc --noEmit",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "gsap": "^3.14.2",
+    "lucide-react": "^1.7.0",
+    "motion": "^12.6.0",
+    "next": "^16.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.0.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^24.12.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.4.0",
+    "tailwindcss": "^4.2.2",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.57.0",
+    "vitest": "^3.0.8"
+  }
+}

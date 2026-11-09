@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* ─── Font Faces (Identidade Visual Exímia Tech) ──────────── */
+@font-face {
+  font-family: 'Michroma';
+  src: url('../assets/fonts/Michroma/Michroma-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Archivo';
+  src: url('../assets/fonts/Archivo/Archivo-VariableFont_wdth,wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-stretch: 75% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ─── Design Tokens (Paleta Oficial Exímia Tech + Nexo) ───── */
+@theme {
+  --color-eximia-primary-900: #185054;
+  --color-eximia-primary-700: #546b6e;
+  --color-eximia-primary-500: #859a9b;
+  --color-eximia-primary-300: #8baba6;
+  --color-eximia-primary-100: #b6c8c6;
+
+  --color-eximia-base-black: #000000;
+  --color-eximia-base-dark: #303030;
+  --color-eximia-base-muted: #8b8b8b;
+  --color-eximia-base-light: #d9d9d9;
+  --color-eximia-base-white: #ffffff;
+
+  --color-eximia-support-navy: #1f2f43;
+  --color-eximia-support-slate: #9cafc6;
+
+  --color-eximia-accent-green: #0df0b2;
+  --color-eximia-accent-blue: #004fff;
+  --color-eximia-accent-orange: #ef5000;
+
+  --font-heading: 'Michroma', sans-serif;
+  --font-body: 'Archivo', sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #050a0b;
+  color: #ffffff;
+  font-family: 'Archivo', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

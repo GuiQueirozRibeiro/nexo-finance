@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "incremental": false,
+    "outDir": "./dist-core",
+    "rootDir": "./src",
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "module": "ES2022",
+    "moduleResolution": "bundler"
+  },
+  "include": [
+    "src/core/**/*.ts",
+    "src/domain/**/*.ts",
+    "src/data/**/*.ts",
+    "src/legacy/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist-core",
+    "**/*.test.ts"
+  ]
+}
