@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import '../src/index.css';
 
 export const metadata: Metadata = {
-  title: 'Nexo — Controle Financeiro, Open Finance & PIX',
+  title: 'Nexo: Controle Financeiro, Open Finance e PIX',
   description:
     'Sua vida financeira consolidada em um único lugar. Open Finance, PIX instantâneo e inteligência financeira em uma experiência minimalista.',
   manifest: '/manifest.webmanifest',

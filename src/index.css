@@ -109,6 +109,18 @@ html[data-theme="light"] .bg-\[\#121215\] {
   border-color: rgba(9, 9, 11, 0.1) !important;
 }
 
-html[data-theme="light"] .text-white {
-  color: #09090b !important;
+/* Botões, badges ativas e pills com fundo laranja têm SEMPRE texto e ícones brancos */
+.bg-\[\#ff5500\],
+.bg-\[\#ef5000\],
+[class*="bg-[#ff5500]"],
+[class*="bg-[#ef5000]"] {
+  color: #ffffff !important;
+}
+
+.bg-\[\#ff5500\] *,
+.bg-\[\#ef5000\] *,
+[class*="bg-[#ff5500]"] *,
+[class*="bg-[#ef5000]"] * {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
 }

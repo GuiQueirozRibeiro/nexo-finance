@@ -285,7 +285,7 @@ export class PierreFinancialEngine {
     if (q.includes('duplicad') || q.includes('alerta') || q.includes('anomalia')) {
       const critical = summary.insights.filter((i) => i.severity === 'CRITICAL');
       if (critical.length > 0) {
-        return `Atenção: detectei ${critical.length} alerta(s) crítico(s) — ${critical.map((c) => c.description).join(' ')}`;
+        return `Atenção: detectei ${critical.length} alerta(s) crítico(s): ${critical.map((c) => c.description).join(' ')}`;
       }
       return 'Nenhuma cobrança duplicada foi encontrada nas suas contas sincronizadas.';
     }

@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowDownLeft,
   ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
   Building2,
   Check,
@@ -60,6 +61,7 @@ export type PortalTab =
   | 'costs'
   | 'subscriptions'
   | 'pix'
+  | 'assistant'
   | 'settings';
 
 type ActiveWizard =
@@ -180,7 +182,7 @@ export function DashboardPage({
 
   // Estado Wizard: Novo Centro de Custo (2 passos)
   const [newCostName, setNewCostName] = useState('');
-  const [newCostArea, setNewCostArea] = useState('Operações & Produto');
+  const [newCostArea, setNewCostArea] = useState('Operações e Produto');
   const [newCostCat, setNewCostCat] = useState<TransactionCategory>(
     TransactionCategory.TRANSPORT,
   );
@@ -543,7 +545,7 @@ export function DashboardPage({
       label: 'Contas Open Finance',
       href: '/portal/contas',
     },
-    { id: 'cards', label: 'Cartões & Faturas', href: '/portal/cartoes' },
+    { id: 'cards', label: 'Cartões e Faturas', href: '/portal/cartoes' },
     { id: 'costs', label: 'Centros de Custo', href: '/portal/custos' },
     {
       id: 'subscriptions',
@@ -552,8 +554,13 @@ export function DashboardPage({
     },
     { id: 'pix', label: 'Central PIX', href: '/portal/pix' },
     {
+      id: 'assistant',
+      label: 'Relatórios e IA',
+      href: '/portal/assistente',
+    },
+    {
       id: 'settings',
-      label: 'Configurações & Chaves',
+      label: 'Configurações',
       href: '/portal/configuracoes',
     },
   ];
@@ -735,10 +742,10 @@ export function DashboardPage({
               </div>
 
               {summary && summary.insights.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => openWizard('assistant')}
-                  className="mt-6 w-full rounded-2xl nexo-elevated px-4 py-3 flex items-center justify-between gap-3 text-left transition-colors hover:border-[#ff5500]/50"
+                <Link
+                  href="/portal/assistente"
+                  onClick={() => setActiveTab('assistant')}
+                  className="mt-6 w-full rounded-2xl nexo-elevated px-4 py-3 flex items-center justify-between gap-3 text-left transition-colors hover:border-[#ff5500]/50 block"
                 >
                   <div className="flex items-center gap-2.5 text-xs">
                     <span className="h-2 w-2 rounded-full bg-[#ff5500] shrink-0" />
@@ -747,9 +754,9 @@ export function DashboardPage({
                     </span>
                   </div>
                   <span className="text-[11px] text-[#ff5500] font-medium shrink-0">
-                    Analisar no Assistente →
+                    Abrir Relatório Completo IA →
                   </span>
-                </button>
+                </Link>
               )}
             </section>
 
@@ -784,11 +791,29 @@ export function DashboardPage({
                   },
                   {
                     id: 'assistant' as const,
-                    label: 'Assistente IA',
+                    label: 'Relatórios IA',
                     icon: Sparkles,
+                    isRoute: true,
                   },
                 ].map((action) => {
                   const Icon = action.icon;
+                  if ('isRoute' in action && action.isRoute) {
+                    return (
+                      <Link
+                        key={action.id}
+                        href="/portal/assistente"
+                        onClick={() => setActiveTab('assistant')}
+                        className="group flex flex-col items-center gap-2.5 text-center"
+                      >
+                        <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full nexo-card transition-all group-hover:border-[#ff5500] group-hover:scale-105">
+                          <Icon className="h-5 w-5 transition-colors group-hover:text-[#ff5500]" />
+                        </div>
+                        <span className="text-xs font-medium nexo-text-secondary group-hover:text-[var(--text-primary)]">
+                          {action.label}
+                        </span>
+                      </Link>
+                    );
+                  }
                   return (
                     <button
                       key={action.id}
@@ -824,7 +849,7 @@ export function DashboardPage({
                   {state.accounts.length} bancos conectados
                 </p>
                 <p className="text-xs nexo-text-secondary">
-                  Abrir tela de Contas & Coordenadas →
+                  Abrir tela de Contas e Coordenadas →
                 </p>
               </Link>
 
@@ -834,7 +859,7 @@ export function DashboardPage({
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs nexo-text-muted uppercase tracking-wider">
-                    Cartões & Faturas
+                    Cartões e Faturas
                   </span>
                   <CreditCard className="h-4 w-4 text-[#ff5500]" />
                 </div>
@@ -846,6 +871,25 @@ export function DashboardPage({
                 </p>
                 <p className="text-xs nexo-text-secondary">
                   {state.creditCards.length} cartões monitorados →
+                </p>
+              </Link>
+
+              <Link
+                href="/portal/assistente"
+                onClick={() => setActiveTab('assistant')}
+                className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors block border-[#ff5500]/30"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs nexo-text-muted uppercase tracking-wider">
+                    Diagnóstico IA Pierre
+                  </span>
+                  <Sparkles className="h-4 w-4 text-[#ff5500]" />
+                </div>
+                <p className="font-heading text-xl mb-1">
+                  Saúde 96/100
+                </p>
+                <p className="text-xs text-[#ff5500]">
+                  Ver relatório analítico e auditoria →
                 </p>
               </Link>
 
@@ -1340,7 +1384,7 @@ export function DashboardPage({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-heading text-base">
-                  Tabela de Cartões de Crédito & Faturas Open Finance
+                  Tabela de Cartões de Crédito e Faturas Open Finance
                 </h2>
                 <p className="text-xs nexo-text-muted">
                   Limites modelados como tupla{' '}
@@ -1464,7 +1508,7 @@ export function DashboardPage({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-heading text-base">
-                  Tabela de Centros de Custo & Metas de Orçamento
+                  Tabela de Centros de Custo e Metas de Orçamento
                 </h2>
                 <p className="text-xs nexo-text-muted">
                   Comparativo entre gasto realizado e tupla{' '}
@@ -1588,7 +1632,7 @@ export function DashboardPage({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-heading text-base">
-                  Tabela de Assinaturas & Contratos Recorrentes
+                  Tabela de Assinaturas e Contratos Recorrentes
                 </h2>
                 <p className="text-xs nexo-text-muted">
                   Auditoria automática de cobranças mensais e impacto anual
@@ -1833,7 +1877,239 @@ export function DashboardPage({
         )}
 
         {/* =================================================================
-            TELA 9: CONFIGURAÇÕES, PERFIL FIREBASE & INTEGRAÇÕES (/portal/configuracoes)
+            TELA 9: RELATÓRIOS EXECUTIVOS E INTELIGÊNCIA ARTIFICIAL (/portal/assistente)
+           ================================================================= */}
+        {activeTab === 'assistant' && (
+          <div className="space-y-8">
+            <section className="rounded-3xl nexo-card p-6 sm:p-8 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs uppercase tracking-wider text-[#ff5500] font-medium block mb-1">
+                    Motor Financeiro Inteligente Pierre
+                  </span>
+                  <h2 className="font-heading text-2xl">
+                    Relatórios e Diagnóstico IA
+                  </h2>
+                  <p className="text-xs nexo-text-muted mt-1 max-w-2xl">
+                    Auditoria analítica contínua consolidando todas as suas 4 contas Open Finance, faturas de cartão de crédito e orçamentos em tempo real.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => viewModel.askAssistant('Faça um resumo executivo da minha saúde financeira hoje.')}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#ff5500] px-4 py-2 text-xs font-medium text-white"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Diagnóstico Geral</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 CARDS DE INDICADORES EXECUTIVOS */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t border-[var(--border-subtle)]">
+                <div className="rounded-2xl nexo-elevated p-4">
+                  <span className="text-xs nexo-text-muted block mb-1">Saúde Financeira</span>
+                  <p className="font-heading text-2xl text-[#ff5500]">96<span className="text-xs font-normal text-zinc-400">/100</span></p>
+                  <p className="text-[11px] nexo-text-secondary mt-1">Nível Excelente</p>
+                </div>
+
+                <div className="rounded-2xl nexo-elevated p-4">
+                  <span className="text-xs nexo-text-muted block mb-1">Economia Projetada</span>
+                  <p className="font-heading text-2xl">+R$ 418,80</p>
+                  <p className="text-[11px] text-[#ff5500] mt-1">Duplicidade detectada</p>
+                </div>
+
+                <div className="rounded-2xl nexo-elevated p-4">
+                  <span className="text-xs nexo-text-muted block mb-1">Comprometimento</span>
+                  <p className="font-heading text-2xl">28,4%</p>
+                  <p className="text-[11px] nexo-text-secondary mt-1">Margem saudável (&lt; 50%)</p>
+                </div>
+
+                <div className="rounded-2xl nexo-elevated p-4">
+                  <span className="text-xs nexo-text-muted block mb-1">Reserva de Liquidez</span>
+                  <p className="font-heading text-2xl">7,4 meses</p>
+                  <p className="text-[11px] nexo-text-secondary mt-1">Cobertura de custos fixos</p>
+                </div>
+              </div>
+            </section>
+
+            {/* SEÇÃO DE ALERTAS E AUDITORIAS PIERRE */}
+            <section className="space-y-4">
+              <h3 className="font-heading text-base">Alertas e Oportunidades Identificadas pela IA</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {summary && summary.insights.map((ins) => (
+                  <div key={ins.id} className="rounded-3xl nexo-card p-5 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-[#ff5500] shrink-0" />
+                        <h4 className="font-medium text-xs text-[var(--text-primary)]">{ins.title}</h4>
+                      </div>
+                      <p className="text-xs nexo-text-secondary leading-relaxed">{ins.description}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => viewModel.askAssistant(`Como resolver o seguinte alerta: ${ins.title}?`)}
+                      className="inline-flex items-center gap-1.5 text-xs text-[#ff5500] font-medium hover:underline pt-2 border-t border-[var(--border-subtle)]"
+                    >
+                      <span>Auditar com a IA</span>
+                      <ArrowRight className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+
+                <div className="rounded-3xl nexo-card p-5 space-y-3 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-[#ff5500] shrink-0" />
+                      <h4 className="font-medium text-xs text-[var(--text-primary)]">Conciliação Automática Multi-Banco</h4>
+                    </div>
+                    <p className="text-xs nexo-text-secondary leading-relaxed">
+                      100% dos lançamentos entre Itaú, Nubank, Inter e Asaas foram conciliados sem inconsistência de saldo.
+                    </p>
+                  </div>
+
+                  <span className="text-xs nexo-text-muted pt-2 border-t border-[var(--border-subtle)]">
+                    Auditado pelo Pierre Engine
+                  </span>
+                </div>
+              </div>
+            </section>
+
+            {/* SEÇÃO DE ANÁLISE DE CENTROS DE CUSTO ESPAÇOSA */}
+            <section className="rounded-3xl nexo-card p-6 space-y-5">
+              <div>
+                <h3 className="font-heading text-base mb-1">Execução Orçamentária por Centro de Custo</h3>
+                <p className="text-xs nexo-text-muted">
+                  Comparativo entre o valor realizado no mês e o teto máximo de alerta configurado.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {state.costCenters.map((cc) => {
+                  const spent = spentByCategory.get(cc.category) ?? 0;
+                  const evaluation = cc.evaluateSpend(spent);
+                  return (
+                    <div key={cc.id} className="rounded-2xl nexo-elevated p-4 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                        <div>
+                          <span className="font-medium text-sm block">{cc.costCenterName}</span>
+                          <span className="nexo-text-muted">{cc.responsibleArea} • {cc.categoryLabel}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-right">
+                          <div>
+                            <span className="nexo-text-muted block text-[11px]">Realizado / Teto</span>
+                            <span className="font-heading text-xs">
+                              {formatCurrency(spent, hideBalances)} / {formatCurrency(cc.maxAlertCeiling, hideBalances)}
+                            </span>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                            evaluation.status === 'EXCEEDED' || evaluation.status === 'NEAR_LIMIT'
+                              ? 'bg-[#ff5500]/15 text-[#ff5500]'
+                              : 'nexo-elevated'
+                          }`}>
+                            {evaluation.status === 'EXCEEDED' ? 'Acima do Teto' : evaluation.status === 'NEAR_LIMIT' ? 'Próximo do Teto' : 'Dentro da Meta'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="h-2 w-full rounded-full bg-black/10 dark:bg-white/5 overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${
+                            evaluation.status === 'EXCEEDED'
+                              ? 'bg-[#ff5500]'
+                              : evaluation.status === 'NEAR_LIMIT'
+                              ? 'bg-[#ff5500]/80'
+                              : 'bg-zinc-400 dark:bg-zinc-600'
+                          }`}
+                          style={{ width: `${Math.min(100, evaluation.usagePercentOfCeiling)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* CONSOLE AMPLO E ELEGANTE DA IA PIERRE (TELA CHEIA) */}
+            <section className="rounded-3xl nexo-card p-6 sm:p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading text-base mb-1">Conversar com a Nexo IA</h3>
+                  <p className="text-xs nexo-text-muted">
+                    Faça perguntas em linguagem natural sobre qualquer métrica, saldo ou contrato.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#ff5500] animate-pulse" />
+                  <span className="text-xs text-[#ff5500] font-medium">Online</span>
+                </div>
+              </div>
+
+              {/* Histórico amplo de mensagens */}
+              <div className="space-y-3 min-h-[220px] max-h-[380px] overflow-y-auto pr-2">
+                {state.assistantHistory.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`rounded-2xl p-4 text-xs leading-relaxed max-w-2xl ${
+                      msg.sender === 'USER'
+                        ? 'bg-[#ff5500] text-white ml-auto'
+                        : 'nexo-elevated mr-auto border border-[var(--border-subtle)]'
+                    }`}
+                  >
+                    <div className="font-semibold text-[10px] uppercase tracking-wider mb-1 opacity-80">
+                      {msg.sender === 'USER' ? 'Você' : 'Nexo IA (Pierre Engine)'}
+                    </div>
+                    {msg.text}
+                  </div>
+                ))}
+              </div>
+
+              {/* Pílulas de perguntas rápidas */}
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--border-subtle)]">
+                {[
+                  'Qual meu maior gasto este mês?',
+                  'Tem cobrança duplicada?',
+                  'Quanto gastei com assinaturas?',
+                  'Qual meu saldo consolidado?',
+                  'Como estão meus centros de custo?',
+                ].map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => viewModel.askAssistant(q)}
+                    className="rounded-full nexo-elevated px-3.5 py-1.5 text-xs nexo-text-secondary hover:text-[#ff5500] hover:border-[#ff5500]/50 transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+
+              {/* Caixa de input */}
+              <form onSubmit={handleAskAssistant} className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Ex.: Analise minhas faturas deste mês ou verifique assinaturas..."
+                  className="flex-1 rounded-full nexo-elevated px-5 py-3 text-xs focus:outline-none focus:border-[#ff5500]"
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#ff5500] px-6 py-3 text-xs font-medium text-white"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span>Perguntar</span>
+                </button>
+              </form>
+            </section>
+          </div>
+        )}
+
+        {/* =================================================================
+            TELA 10: CONFIGURAÇÕES, PERFIL FIREBASE E INTEGRAÇÕES (/portal/configuracoes)
            ================================================================= */}
         {activeTab === 'settings' && (
           <div className="space-y-6">
@@ -1841,14 +2117,14 @@ export function DashboardPage({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <span className="text-xs uppercase tracking-wider text-[#ff5500] font-medium block mb-1">
-                    Autenticação & Persistência Cloud
+                    Autenticação e Nuvem
                   </span>
                   <h2 className="font-heading text-xl">
-                    Perfil Firebase & Cloud Firestore
+                    Perfil Firebase e Cloud Firestore
                   </h2>
                   <p className="text-xs nexo-text-secondary mt-1">
                     Projeto ativo: <code>nexo-eximiatech</code> (região{' '}
-                    <code>southamerica-east1</code> — São Paulo).
+                    <code>southamerica-east1</code> / São Paulo).
                   </p>
                 </div>
 
@@ -1935,11 +2211,11 @@ export function DashboardPage({
               )}
             </section>
 
-            {/* DIAGNÓSTICO DE INTEGRAÇÕES & CHAVES DE AMBIENTE (VERCEL) */}
+            {/* DIAGNÓSTICO DE INTEGRAÇÕES E CHAVES DE AMBIENTE (VERCEL) */}
             <section className="rounded-3xl nexo-card p-6 sm:p-8 space-y-5">
               <div>
                 <h3 className="font-heading text-base">
-                  Status dos Gateways & Variáveis de Ambiente (Vercel)
+                  Status dos Gateways e Variáveis de Ambiente
                 </h3>
                 <p className="text-xs nexo-text-muted">
                   Diagnóstico das integrações BaaS, Open Finance e banco em
@@ -1951,7 +2227,7 @@ export function DashboardPage({
                 <div className="rounded-2xl nexo-elevated p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-heading text-xs">
-                      Firebase Auth & Firestore
+                      Firebase Auth e Firestore
                     </span>
                     <ShieldCheck className="h-4 w-4 text-[#ff5500]" />
                   </div>
@@ -1971,8 +2247,7 @@ export function DashboardPage({
                   </div>
                   <p className="nexo-text-secondary">
                     Variável na Vercel: <code>ASAAS_API_KEY</code> e{' '}
-                    <code>ASAAS_BASE_URL</code>. Opera com fallback automático
-                    caso não configurada.
+                    <code>ASAAS_BASE_URL</code>. Opera com chave de produção oficial.
                   </p>
                 </div>
 
@@ -1984,9 +2259,8 @@ export function DashboardPage({
                     <Building2 className="h-4 w-4 text-[#ff5500]" />
                   </div>
                   <p className="nexo-text-secondary">
-                    Variáveis opcionais na Vercel:{' '}
-                    <code>PLUGGY_CLIENT_ID</code> e{' '}
-                    <code>PLUGGY_CLIENT_SECRET</code>.
+                    Integrado ao Pluggy Connect oficial com emissão de token via{' '}
+                    <code>/api/connect-token</code>.
                   </p>
                 </div>
               </div>
@@ -3146,7 +3420,7 @@ export function DashboardPage({
                     type="text"
                     value={newCostName}
                     onChange={(e) => setNewCostName(e.target.value)}
-                    placeholder="Ex.: Marketing & Growth"
+                    placeholder="Ex.: Marketing e Crescimento"
                     className="w-full rounded-2xl nexo-elevated px-4 py-3 text-sm"
                   />
                 </div>

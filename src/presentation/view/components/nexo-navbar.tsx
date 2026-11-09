@@ -53,6 +53,7 @@ export function NexoNavbar() {
   const navItems = [
     { href: '/', label: 'Início' },
     { href: '/portal', label: 'Portal' },
+    { href: '/portal/assistente', label: 'Relatórios IA' },
     { href: '/arquitetura', label: 'Arquitetura TS' },
   ] as const;
 
@@ -76,7 +77,7 @@ export function NexoNavbar() {
       {!pwaSnap.isOnline && (
         <div className="bg-[#ff5500] text-white text-xs font-medium py-1 px-4 text-center flex items-center justify-center gap-2">
           <WifiOff className="h-3.5 w-3.5" />
-          <span>Modo offline ativo — alterações salvas localmente</span>
+          <span>Modo offline ativo: alterações salvas localmente</span>
         </div>
       )}
 

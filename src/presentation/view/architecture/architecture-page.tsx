@@ -291,10 +291,10 @@ export function ArchitecturePage() {
             <div className="flex flex-wrap gap-1.5">
               {[
                 { id: 'ALL', label: 'Todos (16)' },
-                { id: 'C1', label: '1. Fundamentos & Inferência' },
-                { id: 'C2', label: '2. Interfaces, Tuplas & OOP' },
-                { id: 'C3', label: '3. Generics, unknown & Mapped' },
-                { id: 'C4', label: '4. tsconfig, SourceMaps & IA' },
+                { id: 'C1', label: '1. Fundamentos e Inferência' },
+                { id: 'C2', label: '2. Interfaces, Tuplas e OOP' },
+                { id: 'C3', label: '3. Generics, unknown e Mapped' },
+                { id: 'C4', label: '4. Compilação, SourceMaps e IA' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -363,7 +363,7 @@ export function ArchitecturePage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <span className="block text-xs font-semibold text-[#ff5500] mb-1.5">
-                ANTES — JavaScript sem Tipagem Estática
+                ANTES: JavaScript sem Tipagem Estática
               </span>
               <pre className="rounded-2xl nexo-elevated p-4 text-[11px] font-mono nexo-text-secondary overflow-x-auto max-h-72">
                 <code>{LEGACY_JS_CODE_SNAPSHOT}</code>
@@ -371,7 +371,7 @@ export function ArchitecturePage() {
             </div>
             <div>
               <span className="block text-xs font-semibold mb-1.5">
-                DEPOIS — TypeScript Estrito com unknown + assertNever + Either
+                DEPOIS: TypeScript Estrito com unknown + assertNever + Either
               </span>
               <pre className="rounded-2xl nexo-elevated p-4 text-[11px] font-mono nexo-text-secondary overflow-x-auto max-h-72">
                 <code>{REFACTORED_TS_CODE_SNAPSHOT}</code>

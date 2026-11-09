@@ -17,7 +17,7 @@ export function LandingPage() {
       <NexoNavbar />
 
       <main className="flex-1">
-        {/* HERO MINIMALISTA — Inspirado em The Key Club & Nubank */}
+        {/* HERO MINIMALISTA - Inspirado em The Key Club e Nubank */}
         <section className="mx-auto max-w-5xl px-4 sm:px-6 pt-20 pb-24 sm:pt-28 sm:pb-32 text-center">
           <Revelar>
             <div className="inline-flex items-center gap-2 rounded-full nexo-elevated px-3.5 py-1 text-[11px] tracking-[0.2em] uppercase nexo-text-secondary mb-8">
@@ -110,7 +110,7 @@ export function LandingPage() {
           </Revelar>
         </section>
 
-        {/* 3 PILARES ESSENCIAIS — Layout Editorial Limpo */}
+        {/* 3 PILARES ESSENCIAIS - Layout Editorial Limpo */}
         <section className="border-t border-[var(--border-subtle)] py-24">
           <div className="mx-auto max-w-5xl px-4 sm:px-6">
             <Revelar>
@@ -195,7 +195,7 @@ export function LandingPage() {
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5 text-[#ff5500]" />
-                  Clean Architecture & SOLID
+                  Clean Architecture e SOLID
                 </span>
               </div>
               <Link
