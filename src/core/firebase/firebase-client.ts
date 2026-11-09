@@ -46,22 +46,13 @@ export interface FirestoreUserFinanceSnapshot {
 export type AuthStateListener = (user: NexoAuthUser | null) => void;
 
 const FIREBASE_CONFIG = {
-  apiKey:
-    process.env.NEXT_PUBLIC_FIREBASE_API_KEY ??
-    'AIzaSyCm7Xil_sjhSP7ITlN-aYLPq17_r2UXh4Q',
-  authDomain:
-    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ??
-    'nexo-eximiatech.firebaseapp.com',
-  projectId:
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'nexo-eximiatech',
-  storageBucket:
-    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ??
-    'nexo-eximiatech.firebasestorage.app',
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? '',
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? '',
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? '',
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? '',
   messagingSenderId:
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '334002985649',
-  appId:
-    process.env.NEXT_PUBLIC_FIREBASE_APP_ID ??
-    '1:334002985649:web:b694b73b90a3830d26a090',
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? '',
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? '',
 } as const;
 
 export class FirebaseClientManager {
