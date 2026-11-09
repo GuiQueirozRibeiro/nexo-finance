@@ -10,3 +10,5 @@ export * from './enums/enums';
 export * from './types/advanced-types';
 export * from './config/flavor-config';
 export * from './network/connection-checker';
+export * from './theme/theme-manager';
+export * from './pwa/pwa-manager';

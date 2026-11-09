@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MotionConfig } from 'motion/react';
+import { ThemeManager, type ThemeSnapshot } from '@/core';
 import {
   ArrowRight,
   Bot,
@@ -80,6 +82,16 @@ const ARCHITECTURE_LAYERS = [
 ] as const;
 
 export function LandingPage() {
+  const [themeSnap, setThemeSnap] = useState<ThemeSnapshot>(() =>
+    ThemeManager.getSnapshot(),
+  );
+
+  useEffect(() => {
+    const unsub = ThemeManager.subscribe((next) => setThemeSnap(next));
+    ThemeManager.initialize();
+    return unsub;
+  }, []);
+
   return (
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen bg-[#050a0b] text-white">
@@ -183,9 +195,9 @@ export function LandingPage() {
                       <div className="flex items-center justify-between border-b border-[#185054]/50 pb-4 mb-5">
                         <div className="flex items-center gap-2.5">
                           <img
-                            src="/EXIMIA-LOGO5-C.png"
+                            src={themeSnap.logoPath}
                             alt="Nexo X"
-                            className="h-5 w-5 object-contain"
+                            className="h-6 w-6 rounded object-cover"
                           />
                           <span className="font-heading text-xs tracking-widest text-white">
                             PATRIMÔNIO OPEN FINANCE
@@ -374,9 +386,9 @@ export function LandingPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#859a9b]">
             <div className="flex items-center gap-2">
               <img
-                src="/EXIMIA-LOGO5-C.png"
+                src={themeSnap.logoPath}
                 alt="Exímia Tech"
-                className="h-4 w-auto object-contain"
+                className="h-6 w-6 rounded object-cover"
               />
               <span>
                 Nexo Finance by <strong>Exímia Tech</strong> • Guilherme Queiroz Ribeiro

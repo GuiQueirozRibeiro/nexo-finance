@@ -1,0 +1,38 @@
+{
+  "name": "Nexo Finance by Exímia Tech",
+  "short_name": "Nexo Finance",
+  "description": "Controle Financeiro Inteligente com Open Finance, Assistente IA (estilo Pierre) e Conta Digital PIX Asaas.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#050a0b",
+  "theme_color": "#185054",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/EXIMIA-FAVICON2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/EXIMIA-FAVICON1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Painel Open Finance & PIX",
+      "short_name": "Painel",
+      "url": "/app",
+      "icons": [{ "src": "/EXIMIA-FAVICON2.png", "sizes": "512x512" }]
+    },
+    {
+      "name": "Laboratório da Rubrica TS",
+      "short_name": "Rubrica TS",
+      "url": "/arquitetura",
+      "icons": [{ "src": "/EXIMIA-FAVICON2.png", "sizes": "512x512" }]
+    }
+  ]
+}

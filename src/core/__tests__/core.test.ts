@@ -6,11 +6,14 @@ import {
   FlavorConfig,
   InstitutionCode,
   NoParams,
+  ThemeManager,
+  ThemeMode,
   TransactionCategory,
   ValidationFailure,
   getCategoryLabel,
   getInstitutionDisplayName,
   getPropertyByKey,
+  getThemeModeLabel,
   hasNumberField,
   hasStringField,
   isPlainRecord,
@@ -96,5 +99,17 @@ describe('Core Layer — Type Guards (unknown), keyof, typeof e Enums', () => {
   it('deve verificar conectividade via BrowserConnectionChecker', async () => {
     const offlineChecker = new BrowserConnectionChecker(false);
     expect(await offlineChecker.isConnected()).toBe(false);
+  });
+
+  it('deve alternar temas Claro, Escuro e Sistema no ThemeManager e selecionar a logo correta (FAVICON1 vs FAVICON2)', () => {
+    expect(getThemeModeLabel(ThemeMode.SYSTEM)).toBe('Sistema');
+
+    const lightSnap = ThemeManager.setMode(ThemeMode.LIGHT);
+    expect(lightSnap.resolved).toBe('light');
+    expect(lightSnap.logoPath).toBe('/EXIMIA-FAVICON1.png');
+
+    const darkSnap = ThemeManager.setMode(ThemeMode.DARK);
+    expect(darkSnap.resolved).toBe('dark');
+    expect(darkSnap.logoPath).toBe('/EXIMIA-FAVICON2.png');
   });
 });

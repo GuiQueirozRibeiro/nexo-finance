@@ -21,6 +21,30 @@ export enum AppFlavor {
 }
 
 /**
+ * Preferência de tema visual persistida no localStorage (Claro, Escuro ou Sistema).
+ */
+export enum ThemeMode {
+  SYSTEM = 'SYSTEM',
+  DARK = 'DARK',
+  LIGHT = 'LIGHT',
+}
+
+export type ResolvedTheme = 'dark' | 'light';
+
+export function getThemeModeLabel(mode: ThemeMode): string {
+  switch (mode) {
+    case ThemeMode.SYSTEM:
+      return 'Sistema';
+    case ThemeMode.DARK:
+      return 'Escuro';
+    case ThemeMode.LIGHT:
+      return 'Claro';
+    default:
+      return assertNever(mode, 'Modo de tema desconhecido');
+  }
+}
+
+/**
  * Categorias financeiras monitoradas pelo assistente inteligente do Nexo (estilo Pierre).
  */
 export enum TransactionCategory {

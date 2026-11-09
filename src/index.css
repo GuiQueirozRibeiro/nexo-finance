@@ -61,3 +61,58 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ─── Adaptação Completa para Tema Claro (data-theme="light") ─── */
+html[data-theme="light"] body,
+html[data-theme="light"] .bg-\[\#050a0b\],
+html[data-theme="light"] .bg-\[\#071012\] {
+  background-color: #f3f7f7 !important;
+  color: #0d1f22 !important;
+}
+
+html[data-theme="light"] header {
+  background-color: rgba(243, 247, 247, 0.9) !important;
+  border-color: rgba(24, 80, 84, 0.2) !important;
+}
+
+html[data-theme="light"] .bg-\[\#0a1416\],
+html[data-theme="light"] .bg-\[\#0a1416\]\/90,
+html[data-theme="light"] .bg-\[\#0b1719\]\/90,
+html[data-theme="light"] .from-\[\#0d1f22\]\/90,
+html[data-theme="light"] .from-\[\#0b191b\] {
+  background: #ffffff !important;
+  border-color: rgba(24, 80, 84, 0.22) !important;
+  box-shadow: 0 8px 24px rgba(13, 31, 34, 0.06);
+}
+
+html[data-theme="light"] .bg-black,
+html[data-theme="light"] .bg-black\/50,
+html[data-theme="light"] .bg-black\/60,
+html[data-theme="light"] .bg-black\/70,
+html[data-theme="light"] .bg-black\/80,
+html[data-theme="light"] .bg-black\/90 {
+  background-color: #ebf1f1 !important;
+  border-color: rgba(24, 80, 84, 0.22) !important;
+}
+
+html[data-theme="light"] .text-white {
+  color: #0d1f22 !important;
+}
+
+html[data-theme="light"] .text-\[\#b6c8c6\],
+html[data-theme="light"] .text-\[\#d9d9d9\] {
+  color: #2c4a4e !important;
+}
+
+html[data-theme="light"] .text-\[\#859a9b\],
+html[data-theme="light"] .text-\[\#8baba6\] {
+  color: #46666a !important;
+}
+
+html[data-theme="light"] .text-\[\#0df0b2\] {
+  color: #0a8a68 !important;
+}
+
+html[data-theme="light"] footer {
+  background-color: #e4eded !important;
+}
