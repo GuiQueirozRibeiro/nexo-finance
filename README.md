@@ -16,10 +16,10 @@ src/
 │   ├── network/           # IConnectionChecker e BrowserConnectionChecker
 │   ├── types/             # Type Guards (unknown), keyof, typeof, Mapped & Conditional Types, assertNever
 │   └── usecase/           # Contrato genérico IUseCase<SuccessType, Params> e Singleton NoParams
-├── domain/                # Camada Domain (Fase 1 ⏳: Entities OOP, Tuplas, Interfaces de Repositório e UseCases)
-├── data/                  # Camada Data (Fase 2 ⏳: Models com fromJson unknown, DataSources e Repositories)
-├── legacy/                # Evolução JS -> TS (Fase 3 ⏳: Evidências de refatoração e segurança de tipos)
-└── presentation/          # Camada Presentation (Fases 4 e 5 ⏳: ViewModels TS + Views Next.js / Motion)
+├── domain/                # Camada Domain (Entities OOP, Tuplas, Interfaces de Repositório e UseCases)
+├── data/                  # Camada Data (Models com fromUnknown, DataSources, Repositories e /api/asaas/pix)
+├── legacy/                # Evolução JS -> TS (RefactoredReconciliationService + Avaliação de IA)
+└── presentation/          # Camada Presentation (FinanceViewModel em TS puro + Views Next.js / Motion)
 ```
 
 ## Status das Fases
@@ -27,12 +27,12 @@ src/
 | Fase | Descrição | Status |
 |---|---|---|
 | **Fase 0** | Setup, `tsconfig.json` (`sourceMap: true`), Flavors e Camada `src/core/` | ✅ Concluída |
-| **Fase 1** | Camada `src/domain/`: Entities OOP, Tuplas, Contratos de Repositório (SOLID) e UseCases | ⏳ Próxima |
-| **Fase 2** | Camada `src/data/`: Models (`unknown` + Type Guards), Open Finance e Integração PIX Asaas | ⏳ Pendente |
-| **Fase 3** | Módulo `src/legacy/`: Migração e Refatoração de JavaScript para TypeScript + Testes Unitários | ⏳ Pendente |
-| **Fase 4** | Camada `src/presentation/viewmodel/` + Landing Page Cinematográfica (`motion/react`) | ⏳ Pendente |
-| **Fase 5** | Web App (`/app`): Open Finance, Assistente Inteligente (estilo Pierre) e PIX Asaas | ⏳ Pendente |
-| **Fase 6** | Laboratório da Rubrica (`/arquitetura`) + Relatório Final em PDF (`docs/`) | ⏳ Pendente |
+| **Fase 1** | Camada `src/domain/`: Entities OOP, Tuplas, Contratos de Repositório (SOLID) e UseCases | ✅ Concluída |
+| **Fase 2** | Camada `src/data/`: Models (`unknown` + Type Guards), Open Finance e Integração PIX Asaas | ✅ Concluída |
+| **Fase 3** | Módulo `src/legacy/`: Migração e Refatoração de JavaScript para TypeScript + Testes Unitários | ✅ Concluída |
+| **Fase 4** | Camada `src/presentation/viewmodel/` + Landing Page Cinematográfica (`motion/react`) | ✅ Concluída |
+| **Fase 5** | Web App (`/app`): Open Finance, Assistente Inteligente (estilo Pierre) e PIX Asaas | ✅ Concluída |
+| **Fase 6** | Laboratório da Rubrica (`/arquitetura`) + Relatório Final em PDF (`docs/`) | ✅ Concluída |
 
 ## Documentação Didática (`docs/`)
 
@@ -40,6 +40,8 @@ src/
 - [02 — Arquitetura: Clean Architecture + SOLID + MVVM](docs/02-arquitetura.md)
 - [03 — Mapa da Rubrica (16 itens mapeados no código)](docs/03-mapa-da-rubrica.md)
 - [Diário de Fases](docs/diario-de-fases.md)
+- [Relatório Final da Disciplina (Markdown)](docs/guilhermeribeiro_typescriptparadesenvolvimentofrontend_pd.md)
+- [Relatório Final da Disciplina (PDF)](docs/guilhermeribeiro_typescriptparadesenvolvimentofrontend_pd.pdf)
 
 ## Comandos Principais
 
@@ -48,6 +50,6 @@ npm run dev          # Inicia servidor de desenvolvimento Next.js
 npm run typecheck    # Verificação estática de tipos (tsc --noEmit)
 npm run build:core   # Transpila a arquitetura TS pura para dist-core/ com Source Maps (.js.map)
 npm run lint         # Executa ESLint estrito (zero any)
-npm test             # Executa suíte de testes unitários (Vitest)
+npm test             # Executa suíte de 15 testes unitários (Vitest)
 npm run build        # Build de produção Next.js
 ```
