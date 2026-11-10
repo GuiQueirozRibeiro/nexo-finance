@@ -1,7 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, Check, Lock, QrCode, Sparkles } from 'lucide-react';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Building2,
+  Check,
+  Lock,
+  QrCode,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import {
   BarraProgresso,
   Grupo,
@@ -17,155 +26,202 @@ export function LandingPage() {
       <NexoNavbar />
 
       <main className="flex-1">
-        {/* HERO MINIMALISTA - Inspirado em The Key Club e Nubank */}
-        <section className="mx-auto max-w-5xl px-4 sm:px-6 pt-20 pb-24 sm:pt-28 sm:pb-32 text-center">
-          <Revelar>
-            <div className="inline-flex items-center gap-2 rounded-full nexo-elevated px-3.5 py-1 text-[11px] tracking-[0.2em] uppercase nexo-text-secondary mb-8">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#ff5500]" />
-              <span>Open Finance • PIX • Inteligência</span>
-            </div>
-          </Revelar>
+        {/* HERO ULTRAWIDE & MOBILE RESPONSIVO */}
+        <section className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-14 xl:px-20 pt-12 pb-16 sm:pt-20 sm:pb-28">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-16 items-center">
+            {/* Coluna Esquerda: Proposta de Valor */}
+            <div className="lg:col-span-7 space-y-6">
+              <Revelar>
+                <div className="inline-flex items-center gap-2 rounded-full nexo-elevated px-4 py-1.5 text-[11px] tracking-[0.2em] uppercase nexo-text-secondary">
+                  <span className="h-2 w-2 rounded-full bg-[#ff5500]" />
+                  <span>Banco Digital • Open Finance BACEN • PIX Asaas</span>
+                </div>
+              </Revelar>
 
-          <Revelar atraso={0.06}>
-            <h1 className="font-heading text-3xl sm:text-5xl lg:text-6xl tracking-tight leading-[1.12] max-w-4xl mx-auto mb-6">
-              Todas as suas contas em um único lugar.{' '}
-              <span className="text-[#ff5500]">Sem ruído.</span>
-            </h1>
-          </Revelar>
+              <Revelar atraso={0.06}>
+                <h1 className="font-heading text-3xl sm:text-5xl xl:text-6xl tracking-tight leading-[1.1] max-w-4xl">
+                  Sua conta bancária e todas as suas instituições em um único
+                  lugar.{' '}
+                  <span className="text-[#ff5500]">Sem ruído.</span>
+                </h1>
+              </Revelar>
 
-          <Revelar atraso={0.12}>
-            <p className="text-base sm:text-lg nexo-text-secondary max-w-xl mx-auto leading-relaxed mb-10">
-              Conecte seus bancos via Open Finance, envie e receba PIX em poucos
-              passos e receba alertas claros sobre cobranças duplicadas e
-              assinaturas.
-            </p>
-          </Revelar>
+              <Revelar atraso={0.12}>
+                <p className="text-base sm:text-lg xl:text-xl nexo-text-secondary max-w-2xl leading-relaxed">
+                  Abra sua conta PF ou PJ com validação KYC completa, conecte
+                  seus bancos via Open Finance Brasil, emita cobranças QR Code
+                  PIX com liquidação instantânea via Asaas BaaS e audite seus
+                  centros de custo em tempo real.
+                </p>
+              </Revelar>
 
-          <Revelar atraso={0.18}>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 rounded-full bg-[#ff5500] px-7 py-3.5 text-sm font-medium text-white transition-all hover:opacity-90"
-              >
-                <span>Entrar na minha conta</span>
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/portal"
-                className="inline-flex items-center gap-2 rounded-full nexo-card px-7 py-3.5 text-sm font-medium transition-colors hover:border-[#ff5500]/50"
-              >
-                <span>Explorar o Portal</span>
-                <ArrowUpRight className="h-4 w-4 text-[#ff5500]" />
-              </Link>
-            </div>
-          </Revelar>
-        </section>
+              <Revelar atraso={0.18}>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <Link
+                    href="/login?mode=register"
+                    className="inline-flex items-center gap-2 rounded-full bg-[#ff5500] px-7 py-4 text-sm font-medium text-white transition-all hover:opacity-90"
+                  >
+                    <span>Abrir minha conta</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center gap-2 rounded-full nexo-card px-7 py-4 text-sm font-medium transition-colors hover:border-[#ff5500]/50"
+                  >
+                    <span>Acessar minha conta</span>
+                    <ArrowUpRight className="h-4 w-4 text-[#ff5500]" />
+                  </Link>
+                </div>
+              </Revelar>
 
-        {/* PREVIEW MINIMALISTA DO CARTÃO / PORTAL */}
-        <section className="mx-auto max-w-4xl px-4 sm:px-6 pb-28">
-          <Revelar atraso={0.1}>
-            <div className="rounded-3xl nexo-card p-6 sm:p-10 shadow-2xl">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pb-8 border-b border-[var(--border-subtle)]">
-                <div>
-                  <span className="text-xs uppercase tracking-[0.2em] nexo-text-muted block mb-2">
-                    Patrimônio Consolidado
-                  </span>
-                  <div className="font-heading text-3xl sm:text-4xl tracking-tight">
-                    R$ 49.490,75
+              <Revelar atraso={0.22}>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-6 border-t border-[var(--border-subtle)] text-xs nexo-text-secondary">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-[#ff5500] shrink-0" />
+                    <span>Resolução BCB nº 142/2021</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-[#ff5500] shrink-0" />
+                    <span>28+ Bancos no Open Finance</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <QrCode className="h-4 w-4 text-[#ff5500] shrink-0" />
+                    <span>Webhooks PIX em Tempo Real</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs nexo-text-secondary">
-                  <span className="h-2 w-2 rounded-full bg-[#ff5500]" />
-                  <span>4 instituições sincronizadas</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-8">
-                <div className="rounded-2xl nexo-elevated p-5">
-                  <span className="text-xs nexo-text-muted block mb-1">
-                    Nubank • Itaú • Inter • Asaas
-                  </span>
-                  <p className="text-sm font-medium">
-                    Saldos unificados em tempo real
-                  </p>
-                </div>
-                <div className="rounded-2xl nexo-elevated p-5">
-                  <span className="text-xs nexo-text-muted block mb-1">
-                    Fluxo Guiado
-                  </span>
-                  <p className="text-sm font-medium">
-                    PIX e lançamentos passo a passo
-                  </p>
-                </div>
-                <div className="rounded-2xl nexo-elevated p-5">
-                  <span className="text-xs text-[#ff5500] block mb-1">
-                    Radar Automático
-                  </span>
-                  <p className="text-sm font-medium">
-                    1 cobrança duplicada detectada
-                  </p>
-                </div>
-              </div>
+              </Revelar>
             </div>
-          </Revelar>
+
+            {/* Coluna Direita: Cockpit Bancário em Escala Real */}
+            <div className="lg:col-span-5">
+              <Revelar atraso={0.1}>
+                <div className="rounded-3xl nexo-card p-6 sm:p-9 shadow-2xl space-y-6">
+                  <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-5">
+                    <div>
+                      <span className="text-[11px] uppercase tracking-[0.2em] text-[#ff5500] font-medium block mb-1">
+                        Conta Titular Nexo • Asaas BaaS
+                      </span>
+                      <div className="font-heading text-2xl sm:text-3xl tracking-tight">
+                        Agência 0001 • Conta 1001-0
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-emerald-500/10 text-emerald-500 px-3 py-1 text-xs font-medium">
+                      KYC Verificado
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="rounded-2xl nexo-elevated p-4 space-y-1">
+                      <span className="text-xs nexo-text-muted block">
+                        Liquidação PIX BaaS
+                      </span>
+                      <p className="text-sm font-medium">
+                        QR Code EMV e Webhooks com trava de idempotência
+                      </p>
+                    </div>
+                    <div className="rounded-2xl nexo-elevated p-4 space-y-1">
+                      <span className="text-xs nexo-text-muted block">
+                        Open Finance Ativo
+                      </span>
+                      <p className="text-sm font-medium">
+                        Santander, Nubank, Itaú, Inter, Bradesco e BTG
+                      </p>
+                    </div>
+                    <div className="rounded-2xl nexo-elevated p-4 space-y-1">
+                      <span className="text-xs nexo-text-muted block">
+                        Conformidade Fiscal
+                      </span>
+                      <p className="text-sm font-medium">
+                        Exportação Contábil OFX 1.02 e CSV
+                      </p>
+                    </div>
+                    <div className="rounded-2xl nexo-elevated p-4 space-y-1">
+                      <span className="text-xs text-[#ff5500] block">
+                        Segurança Biométrica
+                      </span>
+                      <p className="text-sm font-medium">
+                        Validação de CPF/CNPJ, Prova de Vida e PIN 4 dígitos
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Revelar>
+            </div>
+          </div>
         </section>
 
-        {/* 3 PILARES ESSENCIAIS - Layout Editorial Limpo */}
-        <section className="border-t border-[var(--border-subtle)] py-24">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6">
+        {/* 4 PILARES DE ARQUITETURA BANCÁRIA (PREENCHE MONITORES ULTRAWIDE) */}
+        <section className="border-t border-[var(--border-subtle)] py-20">
+          <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-14 xl:px-20">
             <Revelar>
-              <div className="max-w-xl mb-14">
+              <div className="max-w-2xl mb-12">
                 <span className="text-xs uppercase tracking-[0.2em] text-[#ff5500] block mb-2">
-                  Experiência Direta
+                  Engenharia Bancária em Telas Dedicadas
                 </span>
-                <h2 className="font-heading text-2xl sm:text-3xl tracking-tight">
-                  Desenhado para clareza.
+                <h2 className="font-heading text-2xl sm:text-4xl tracking-tight">
+                  Desenhado para telas mobile, notebooks e monitores Ultrawide.
                 </h2>
               </div>
             </Revelar>
 
-            <Grupo className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Grupo className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               <Item className="rounded-3xl nexo-card p-7 flex flex-col justify-between">
                 <div>
-                  <div className="h-10 w-10 rounded-2xl nexo-elevated flex items-center justify-center mb-6">
-                    <QrCode className="h-4 w-4 text-[#ff5500]" />
+                  <div className="h-11 w-11 rounded-2xl nexo-elevated flex items-center justify-center mb-6">
+                    <QrCode className="h-5 w-5 text-[#ff5500]" />
                   </div>
                   <h3 className="font-heading text-base mb-2.5">
-                    PIX em Passos Simples
+                    PIX Asaas em Página Completa
                   </h3>
                   <p className="text-sm nexo-text-secondary leading-relaxed">
-                    Nada de formulários extensos. Escolha o valor, informe a
-                    chave e confirme em um fluxo guiado passo a passo.
+                    Sem janelas modais apertadas. Transfira ou gere QR Codes PIX
+                    reais com preenchimento automático de casas decimais (0,00).
                   </p>
                 </div>
               </Item>
 
               <Item className="rounded-3xl nexo-card p-7 flex flex-col justify-between">
                 <div>
-                  <div className="h-10 w-10 rounded-2xl nexo-elevated flex items-center justify-center mb-6">
-                    <Sparkles className="h-4 w-4 text-[#ff5500]" />
+                  <div className="h-11 w-11 rounded-2xl nexo-elevated flex items-center justify-center mb-6">
+                    <Building2 className="h-5 w-5 text-[#ff5500]" />
                   </div>
                   <h3 className="font-heading text-base mb-2.5">
-                    Auditoria Silenciosa
+                    Open Finance Direto e Instantâneo
                   </h3>
                   <p className="text-sm nexo-text-secondary leading-relaxed">
-                    O motor analisa suas faturas em segundo plano e avisa apenas
-                    quando encontra assinaturas duplicadas ou desvios de meta.
+                    Conecte Santander, Nubank, Itaú, Inter, Bradesco, Caixa e
+                    BTG com autorização imediata de escopos BACEN e saldo ativo.
                   </p>
                 </div>
               </Item>
 
               <Item className="rounded-3xl nexo-card p-7 flex flex-col justify-between">
                 <div>
-                  <div className="h-10 w-10 rounded-2xl nexo-elevated flex items-center justify-center mb-6">
-                    <Lock className="h-4 w-4 text-[#ff5500]" />
+                  <div className="h-11 w-11 rounded-2xl nexo-elevated flex items-center justify-center mb-6">
+                    <Sparkles className="h-5 w-5 text-[#ff5500]" />
                   </div>
                   <h3 className="font-heading text-base mb-2.5">
-                    Controle de Consentimento
+                    Auditoria e Centros de Custo
                   </h3>
                   <p className="text-sm nexo-text-secondary leading-relaxed">
-                    Gerencie quais instituições permanecem conectadas via Open
-                    Finance e revogue permissões com um toque.
+                    Acompanhe 6 tabelas relacionais sincronizadas no Cloud
+                    Firestore com detecção de anomalias e exportação OFX 1.02.
+                  </p>
+                </div>
+              </Item>
+
+              <Item className="rounded-3xl nexo-card p-7 flex flex-col justify-between">
+                <div>
+                  <div className="h-11 w-11 rounded-2xl nexo-elevated flex items-center justify-center mb-6">
+                    <Lock className="h-5 w-5 text-[#ff5500]" />
+                  </div>
+                  <h3 className="font-heading text-base mb-2.5">
+                    Onboarding KYC e Biometria
+                  </h3>
+                  <p className="text-sm nexo-text-secondary leading-relaxed">
+                    Validação matemática de CPF/CNPJ, verificação de documento
+                    com prova de vida facial e política estrita contra senhas
+                    fracas.
                   </p>
                 </div>
               </Item>
@@ -175,19 +231,19 @@ export function LandingPage() {
 
         {/* CTA FINAL */}
         <section className="border-t border-[var(--border-subtle)] py-20">
-          <div className="mx-auto max-w-3xl px-4 sm:px-6 text-center">
+          <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-14 xl:px-20 text-center">
             <Revelar>
-              <h2 className="font-heading text-2xl sm:text-3xl mb-4">
-                Pronto para acessar seu portal?
+              <h2 className="font-heading text-2xl sm:text-4xl mb-4">
+                Abra sua conta digital Nexo com saldo real
               </h2>
-              <p className="text-sm sm:text-base nexo-text-secondary mb-8">
-                Entre com sua conta Firebase ou utilize o acesso instantâneo de
-                demonstração.
+              <p className="text-sm sm:text-base nexo-text-secondary max-w-xl mx-auto mb-8">
+                Conta 100% individual, iniciando zerada (R$ 0,00) e conectada ao
+                Cloud Firestore e Asaas PIX BaaS.
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-4 text-xs nexo-text-secondary mb-8">
+              <div className="flex flex-wrap items-center justify-center gap-6 text-xs nexo-text-secondary mb-8">
                 <span className="inline-flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5 text-[#ff5500]" />
-                  Autenticação Firebase
+                  KYC CPF/CNPJ e Prova de Vida
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5 text-[#ff5500]" />
@@ -195,14 +251,14 @@ export function LandingPage() {
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5 text-[#ff5500]" />
-                  Clean Architecture e SOLID
+                  Clean Architecture + BFF Mobile
                 </span>
               </div>
               <Link
-                href="/login"
-                className="inline-flex items-center gap-2 rounded-full bg-[#ff5500] px-8 py-3.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                href="/login?mode=register"
+                className="inline-flex items-center gap-2 rounded-full bg-[#ff5500] px-8 py-4 text-sm font-medium text-white transition-opacity hover:opacity-90"
               >
-                <span>Acessar agora</span>
+                <span>Criar minha conta agora</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Revelar>
@@ -211,14 +267,14 @@ export function LandingPage() {
       </main>
 
       <footer className="border-t border-[var(--border-subtle)] py-8">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs nexo-text-muted">
-          <span>NEXO • Exímia Tech</span>
+        <div className="mx-auto w-full max-w-[1920px] px-4 sm:px-8 lg:px-14 xl:px-20 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs nexo-text-muted">
+          <span>NEXO BANK • Exímia Tech Soluções Financeiras</span>
           <div className="flex items-center gap-5">
             <Link href="/login" className="hover:text-[#ff5500] transition-colors">
-              Login
+              Acessar Conta
             </Link>
             <Link href="/portal" className="hover:text-[#ff5500] transition-colors">
-              Portal
+              Portal Bancário
             </Link>
             <Link
               href="/arquitetura"

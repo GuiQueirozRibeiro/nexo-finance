@@ -7,13 +7,18 @@
  * 4. costCenters (`CostCenterBudget`)
  * 5. subscriptions (`RecurringSubscription`)
  * 6. pixKeys (`RegisteredPixKey`)
+ *
+ * IMPORTANTE (Política de Banco Real):
+ * - No navegador (produção), contas novas ou limpas iniciam 100% zeradas (`R$ 0,00`,
+ *   `0` transações, `0` cartões, `0` assinaturas, `0` centros de custo e `0` chaves PIX).
+ * - Os dados de `seed-data.ts` só são carregados quando `resetToSeed()` é invocado
+ *   explicitamente pela suíte de testes automatizados (Vitest).
  */
 
 import {
   CacheException,
   FirebaseClientManager,
   InstitutionCode,
-  TransactionCategory,
   isPlainRecord,
   safeJsonParse,
 } from '@/core';
@@ -38,12 +43,63 @@ import {
   INITIAL_TRANSACTIONS,
 } from './seed-data';
 
-const ACCOUNTS_STORAGE_KEY = 'nexo_finance_accounts_v1';
-const TRANSACTIONS_STORAGE_KEY = 'nexo_finance_transactions_v1';
-const CARDS_STORAGE_KEY = 'nexo_finance_cards_v1';
-const COSTS_STORAGE_KEY = 'nexo_finance_costs_v1';
-const SUBS_STORAGE_KEY = 'nexo_finance_subs_v1';
-const PIXKEYS_STORAGE_KEY = 'nexo_finance_pixkeys_v1';
+const ACCOUNTS_STORAGE_KEY = 'nexo_finance_accounts_v3';
+const TRANSACTIONS_STORAGE_KEY = 'nexo_finance_transactions_v3';
+const CARDS_STORAGE_KEY = 'nexo_finance_cards_v3';
+const COSTS_STORAGE_KEY = 'nexo_finance_costs_v3';
+const SUBS_STORAGE_KEY = 'nexo_finance_subs_v3';
+const PIXKEYS_STORAGE_KEY = 'nexo_finance_pixkeys_v3';
+
+// IDs sintéticos legados que nunca devem contaminar contas reais no navegador ou Firestore
+const LEGACY_SYNTHETIC_IDS = new Set<string>([
+  'acc-asaas-eximia',
+  'acc-nubank-pf',
+  'acc-itau-personnalite',
+  'acc-inter-global',
+  'tx-101',
+  'tx-102',
+  'tx-103',
+  'tx-104',
+  'tx-105',
+  'tx-106',
+  'tx-107',
+  'tx-108',
+  'tx-109',
+  'card-nubank-uv',
+  'card-itau-pers',
+  'card-inter-black',
+  'cc-housing',
+  'cc-food',
+  'cc-subs',
+  'cc-transport',
+  'cc-investments',
+  'cost-housing',
+  'cost-food',
+  'cost-transport',
+  'cost-subs',
+  'sub-vercel',
+  'sub-ai',
+  'sub-spotify-1',
+  'sub-spotify-2',
+  'sub-fibra',
+  'pk-email',
+  'pk-phone',
+  'pk-cpf',
+  'pk-evp',
+]);
+
+function createCleanPrimaryAccount(): BankAccountModel {
+  return new BankAccountModel({
+    id: 'acc-nexo-primary',
+    institution: InstitutionCode.ASAAS,
+    nickname: 'Nexo Conta Digital (Asaas)',
+    balance: 0,
+    coordinates: ['461', '0001', '1001-0'],
+    consentStatus: 'AUTHORIZED',
+    lastSyncIso: new Date().toISOString(),
+    colorAccentHex: '#ff5500',
+  });
+}
 
 export interface IFinanceLocalDataSource {
   getAccounts(): BankAccountModel[];
@@ -107,7 +163,10 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
           const validModels: BankAccountModel[] = [];
           for (const item of parsedEither.value) {
             const modelEither = BankAccountModel.fromUnknown(item);
-            if (modelEither.isRight()) {
+            if (
+              modelEither.isRight() &&
+              !LEGACY_SYNTHETIC_IDS.has(modelEither.value.id)
+            ) {
               validModels.push(modelEither.value);
             }
           }
@@ -117,17 +176,17 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
           }
         }
       }
-      const seeded = INITIAL_BANK_ACCOUNTS.map(
-        (props) => new BankAccountModel(props),
+      const clean = [createCleanPrimaryAccount()];
+      window.localStorage.setItem(
+        ACCOUNTS_STORAGE_KEY,
+        JSON.stringify(clean.map((a) => a.toJson())),
       );
-      this.saveAccounts(seeded);
-      return seeded;
+      FinanceLocalDataSourceImpl._memoryAccounts = clean;
+      return clean;
     }
 
     if (!FinanceLocalDataSourceImpl._memoryAccounts) {
-      FinanceLocalDataSourceImpl._memoryAccounts = INITIAL_BANK_ACCOUNTS.map(
-        (props) => new BankAccountModel(props),
-      );
+      FinanceLocalDataSourceImpl._memoryAccounts = [createCleanPrimaryAccount()];
     }
     return [...FinanceLocalDataSourceImpl._memoryAccounts];
   }
@@ -159,27 +218,24 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
           const validModels: TransactionModel[] = [];
           for (const item of parsedEither.value) {
             const modelEither = TransactionModel.fromUnknown(item);
-            if (modelEither.isRight()) {
+            if (
+              modelEither.isRight() &&
+              !LEGACY_SYNTHETIC_IDS.has(modelEither.value.id)
+            ) {
               validModels.push(modelEither.value);
             }
           }
-          if (validModels.length > 0) {
-            FinanceLocalDataSourceImpl._memoryTransactions = validModels;
-            return validModels;
-          }
+          FinanceLocalDataSourceImpl._memoryTransactions = validModels;
+          return validModels;
         }
       }
-      const seeded = INITIAL_TRANSACTIONS.map(
-        (props) => new TransactionModel(props),
-      );
-      this.saveTransactions(seeded);
-      return seeded;
+      window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify([]));
+      FinanceLocalDataSourceImpl._memoryTransactions = [];
+      return [];
     }
 
     if (!FinanceLocalDataSourceImpl._memoryTransactions) {
-      FinanceLocalDataSourceImpl._memoryTransactions = INITIAL_TRANSACTIONS.map(
-        (props) => new TransactionModel(props),
-      );
+      FinanceLocalDataSourceImpl._memoryTransactions = [];
     }
     return [...FinanceLocalDataSourceImpl._memoryTransactions];
   }
@@ -210,28 +266,26 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
         if (parsed.isRight() && Array.isArray(parsed.value)) {
           const cards: CreditCardAccount[] = [];
           for (const item of parsed.value) {
-            if (isPlainRecord(item) && typeof item.id === 'string') {
+            if (
+              isPlainRecord(item) &&
+              typeof item.id === 'string' &&
+              !LEGACY_SYNTHETIC_IDS.has(item.id)
+            ) {
               cards.push(
                 new CreditCardAccount(item as unknown as CreditCardAccountProps),
               );
             }
           }
-          if (cards.length > 0) {
-            FinanceLocalDataSourceImpl._memoryCards = cards;
-            return cards;
-          }
+          FinanceLocalDataSourceImpl._memoryCards = cards;
+          return cards;
         }
       }
-      const seeded = INITIAL_CREDIT_CARDS.map(
-        (props) => new CreditCardAccount(props),
-      );
-      this.saveCreditCards(seeded);
-      return seeded;
+      window.localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify([]));
+      FinanceLocalDataSourceImpl._memoryCards = [];
+      return [];
     }
     if (!FinanceLocalDataSourceImpl._memoryCards) {
-      FinanceLocalDataSourceImpl._memoryCards = INITIAL_CREDIT_CARDS.map(
-        (props) => new CreditCardAccount(props),
-      );
+      FinanceLocalDataSourceImpl._memoryCards = [];
     }
     return [...FinanceLocalDataSourceImpl._memoryCards];
   }
@@ -255,28 +309,26 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
         if (parsed.isRight() && Array.isArray(parsed.value)) {
           const centers: CostCenterBudget[] = [];
           for (const item of parsed.value) {
-            if (isPlainRecord(item) && typeof item.id === 'string') {
+            if (
+              isPlainRecord(item) &&
+              typeof item.id === 'string' &&
+              !LEGACY_SYNTHETIC_IDS.has(item.id)
+            ) {
               centers.push(
                 new CostCenterBudget(item as unknown as CostCenterBudgetProps),
               );
             }
           }
-          if (centers.length > 0) {
-            FinanceLocalDataSourceImpl._memoryCosts = centers;
-            return centers;
-          }
+          FinanceLocalDataSourceImpl._memoryCosts = centers;
+          return centers;
         }
       }
-      const seeded = INITIAL_COST_CENTERS.map(
-        (props) => new CostCenterBudget(props),
-      );
-      this.saveCostCenters(seeded);
-      return seeded;
+      window.localStorage.setItem(COSTS_STORAGE_KEY, JSON.stringify([]));
+      FinanceLocalDataSourceImpl._memoryCosts = [];
+      return [];
     }
     if (!FinanceLocalDataSourceImpl._memoryCosts) {
-      FinanceLocalDataSourceImpl._memoryCosts = INITIAL_COST_CENTERS.map(
-        (props) => new CostCenterBudget(props),
-      );
+      FinanceLocalDataSourceImpl._memoryCosts = [];
     }
     return [...FinanceLocalDataSourceImpl._memoryCosts];
   }
@@ -300,7 +352,11 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
         if (parsed.isRight() && Array.isArray(parsed.value)) {
           const subs: RecurringSubscription[] = [];
           for (const item of parsed.value) {
-            if (isPlainRecord(item) && typeof item.id === 'string') {
+            if (
+              isPlainRecord(item) &&
+              typeof item.id === 'string' &&
+              !LEGACY_SYNTHETIC_IDS.has(item.id)
+            ) {
               subs.push(
                 new RecurringSubscription(
                   item as unknown as RecurringSubscriptionProps,
@@ -308,22 +364,16 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
               );
             }
           }
-          if (subs.length > 0) {
-            FinanceLocalDataSourceImpl._memorySubs = subs;
-            return subs;
-          }
+          FinanceLocalDataSourceImpl._memorySubs = subs;
+          return subs;
         }
       }
-      const seeded = INITIAL_SUBSCRIPTIONS.map(
-        (props) => new RecurringSubscription(props),
-      );
-      this.saveSubscriptions(seeded);
-      return seeded;
+      window.localStorage.setItem(SUBS_STORAGE_KEY, JSON.stringify([]));
+      FinanceLocalDataSourceImpl._memorySubs = [];
+      return [];
     }
     if (!FinanceLocalDataSourceImpl._memorySubs) {
-      FinanceLocalDataSourceImpl._memorySubs = INITIAL_SUBSCRIPTIONS.map(
-        (props) => new RecurringSubscription(props),
-      );
+      FinanceLocalDataSourceImpl._memorySubs = [];
     }
     return [...FinanceLocalDataSourceImpl._memorySubs];
   }
@@ -347,28 +397,26 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
         if (parsed.isRight() && Array.isArray(parsed.value)) {
           const keys: RegisteredPixKey[] = [];
           for (const item of parsed.value) {
-            if (isPlainRecord(item) && typeof item.id === 'string') {
+            if (
+              isPlainRecord(item) &&
+              typeof item.id === 'string' &&
+              !LEGACY_SYNTHETIC_IDS.has(item.id)
+            ) {
               keys.push(
                 new RegisteredPixKey(item as unknown as RegisteredPixKeyProps),
               );
             }
           }
-          if (keys.length > 0) {
-            FinanceLocalDataSourceImpl._memoryPixKeys = keys;
-            return keys;
-          }
+          FinanceLocalDataSourceImpl._memoryPixKeys = keys;
+          return keys;
         }
       }
-      const seeded = INITIAL_PIX_KEYS.map(
-        (props) => new RegisteredPixKey(props),
-      );
-      this.savePixKeys(seeded);
-      return seeded;
+      window.localStorage.setItem(PIXKEYS_STORAGE_KEY, JSON.stringify([]));
+      FinanceLocalDataSourceImpl._memoryPixKeys = [];
+      return [];
     }
     if (!FinanceLocalDataSourceImpl._memoryPixKeys) {
-      FinanceLocalDataSourceImpl._memoryPixKeys = INITIAL_PIX_KEYS.map(
-        (props) => new RegisteredPixKey(props),
-      );
+      FinanceLocalDataSourceImpl._memoryPixKeys = [];
     }
     return [...FinanceLocalDataSourceImpl._memoryPixKeys];
   }
@@ -386,7 +434,7 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
 
   /**
    * Hidrata o armazenamento local a partir do Cloud Firestore (`users/{uid}/finance/snapshot`),
-   * ou envia os dados atuais para a nuvem se for o primeiro acesso do usuário.
+   * filtrando qualquer dado sintético antigo, ou inicializa 100% zerado no primeiro acesso.
    */
   public async syncFromFirestore(): Promise<boolean> {
     if (!this._hasBrowserStorage()) {
@@ -395,95 +443,60 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
     const cloudSnap =
       await FirebaseClientManager.loadUserSnapshotFromFirestore();
     if (!cloudSnap) {
-      // Usuário novo autenticado! Inicia limpo com R$ 0,00 e salva na nuvem
       this.resetToZero();
       return true;
     }
 
-    if (cloudSnap.accounts.length > 0) {
-      window.localStorage.setItem(
-        ACCOUNTS_STORAGE_KEY,
-        JSON.stringify(cloudSnap.accounts),
+    const filterRealRecords = (items: readonly unknown[] | undefined) => {
+      if (!Array.isArray(items)) return [];
+      return items.filter(
+        (item) =>
+          isPlainRecord(item) &&
+          typeof item.id === 'string' &&
+          !LEGACY_SYNTHETIC_IDS.has(item.id),
       );
-    }
-    if (cloudSnap.transactions.length > 0) {
-      window.localStorage.setItem(
-        TRANSACTIONS_STORAGE_KEY,
-        JSON.stringify(cloudSnap.transactions),
-      );
-    }
-    if (cloudSnap.creditCards && cloudSnap.creditCards.length > 0) {
-      window.localStorage.setItem(
-        CARDS_STORAGE_KEY,
-        JSON.stringify(cloudSnap.creditCards),
-      );
-    }
-    if (cloudSnap.costCenters && cloudSnap.costCenters.length > 0) {
-      window.localStorage.setItem(
-        COSTS_STORAGE_KEY,
-        JSON.stringify(cloudSnap.costCenters),
-      );
-    }
-    if (cloudSnap.subscriptions && cloudSnap.subscriptions.length > 0) {
-      window.localStorage.setItem(
-        SUBS_STORAGE_KEY,
-        JSON.stringify(cloudSnap.subscriptions),
-      );
-    }
-    if (cloudSnap.pixKeys && cloudSnap.pixKeys.length > 0) {
-      window.localStorage.setItem(
-        PIXKEYS_STORAGE_KEY,
-        JSON.stringify(cloudSnap.pixKeys),
-      );
-    }
+    };
+
+    const realAccounts = filterRealRecords(cloudSnap.accounts);
+    const realTransactions = filterRealRecords(cloudSnap.transactions);
+    const realCards = filterRealRecords(cloudSnap.creditCards);
+    const realCosts = filterRealRecords(cloudSnap.costCenters);
+    const realSubs = filterRealRecords(cloudSnap.subscriptions);
+    const realPixKeys = filterRealRecords(cloudSnap.pixKeys);
+
+    const accountsToStore =
+      realAccounts.length > 0
+        ? realAccounts
+        : [createCleanPrimaryAccount().toJson()];
+
+    window.localStorage.setItem(
+      ACCOUNTS_STORAGE_KEY,
+      JSON.stringify(accountsToStore),
+    );
+    window.localStorage.setItem(
+      TRANSACTIONS_STORAGE_KEY,
+      JSON.stringify(realTransactions),
+    );
+    window.localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify(realCards));
+    window.localStorage.setItem(COSTS_STORAGE_KEY, JSON.stringify(realCosts));
+    window.localStorage.setItem(SUBS_STORAGE_KEY, JSON.stringify(realSubs));
+    window.localStorage.setItem(
+      PIXKEYS_STORAGE_KEY,
+      JSON.stringify(realPixKeys),
+    );
+
+    // Persiste o snapshot limpo de volta na nuvem caso houvesse lixo sintético antigo
+    this._pushAllToFirestore();
     return true;
   }
 
   public resetToZero(): void {
-    const cleanAccount = new BankAccountModel({
-      id: 'acc-nexo-primary',
-      institution: InstitutionCode.ASAAS,
-      nickname: 'Nexo Conta Digital (Asaas)',
-      balance: 0,
-      coordinates: ['461', '0001', '1001-0'],
-      consentStatus: 'AUTHORIZED',
-      lastSyncIso: new Date().toISOString(),
-      colorAccentHex: '#ff5500',
-    });
+    const cleanAccount = createCleanPrimaryAccount();
 
     FinanceLocalDataSourceImpl._memoryAccounts = [cleanAccount];
     FinanceLocalDataSourceImpl._memoryTransactions = [];
     FinanceLocalDataSourceImpl._memoryCards = [];
-    FinanceLocalDataSourceImpl._memoryCosts = [
-      new CostCenterBudget({
-        id: 'cost-housing',
-        category: TransactionCategory.HOUSING,
-        costCenterName: 'Moradia e Infraestrutura Fixa',
-        responsibleArea: 'Operações / Fixo',
-        thresholds: [2000, 2500],
-      }),
-      new CostCenterBudget({
-        id: 'cost-food',
-        category: TransactionCategory.FOOD,
-        costCenterName: 'Alimentação',
-        responsibleArea: 'Cotidiano',
-        thresholds: [1000, 1500],
-      }),
-      new CostCenterBudget({
-        id: 'cost-transport',
-        category: TransactionCategory.TRANSPORT,
-        costCenterName: 'Mobilidade e Transporte',
-        responsibleArea: 'Logística',
-        thresholds: [400, 600],
-      }),
-      new CostCenterBudget({
-        id: 'cost-subs',
-        category: TransactionCategory.SUBSCRIPTIONS,
-        costCenterName: 'Tecnologia e Assinaturas',
-        responsibleArea: 'Tecnologia',
-        thresholds: [300, 500],
-      }),
-    ];
+    FinanceLocalDataSourceImpl._memoryCosts = [];
     FinanceLocalDataSourceImpl._memorySubs = [];
     FinanceLocalDataSourceImpl._memoryPixKeys = [];
 
@@ -494,12 +507,7 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
       );
       window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify([]));
       window.localStorage.setItem(CARDS_STORAGE_KEY, JSON.stringify([]));
-      window.localStorage.setItem(
-        COSTS_STORAGE_KEY,
-        JSON.stringify(
-          FinanceLocalDataSourceImpl._memoryCosts.map((c) => c.toProps()),
-        ),
-      );
+      window.localStorage.setItem(COSTS_STORAGE_KEY, JSON.stringify([]));
       window.localStorage.setItem(SUBS_STORAGE_KEY, JSON.stringify([]));
       window.localStorage.setItem(PIXKEYS_STORAGE_KEY, JSON.stringify([]));
       this._pushAllToFirestore();
@@ -525,14 +533,5 @@ export class FinanceLocalDataSourceImpl implements IFinanceLocalDataSource {
     FinanceLocalDataSourceImpl._memoryPixKeys = INITIAL_PIX_KEYS.map(
       (props) => new RegisteredPixKey(props),
     );
-
-    if (this._hasBrowserStorage()) {
-      this.saveAccounts(FinanceLocalDataSourceImpl._memoryAccounts);
-      this.saveTransactions(FinanceLocalDataSourceImpl._memoryTransactions);
-      this.saveCreditCards(FinanceLocalDataSourceImpl._memoryCards);
-      this.saveCostCenters(FinanceLocalDataSourceImpl._memoryCosts);
-      this.saveSubscriptions(FinanceLocalDataSourceImpl._memorySubs);
-      this.savePixKeys(FinanceLocalDataSourceImpl._memoryPixKeys);
-    }
   }
 }

