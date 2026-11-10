@@ -3128,39 +3128,42 @@ NEWFILEVERSION:100
            ===================================================================== */}
         {activeWizard && (
           <section className="w-full max-w-3xl mx-auto rounded-3xl nexo-card p-6 sm:p-10 shadow-2xl space-y-6 animate-in fade-in">
-            {/* Cabeçalho do Wizard em Tela Ampla */}
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-4 mb-6">
-              {wizardStep > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => setWizardStep((s) => s - 1)}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium nexo-text-secondary hover:text-[#ff5500] transition-colors"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span>Voltar para o Passo {wizardStep - 1}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={closeWizard}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium nexo-text-secondary hover:text-[#ff5500] transition-colors"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span>Voltar para o Portal</span>
-                </button>
-              )}
+            {/* Cabeçalho do Wizard Responsivo (Sem sobreposição em telas mobile e ultrawide) */}
+            <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] pb-4 mb-6">
+              <div className="flex items-center justify-between gap-2">
+                {wizardStep > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setWizardStep((s) => s - 1)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium nexo-text-secondary hover:text-[#ff5500] transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4 shrink-0" />
+                    <span>Voltar para o Passo {wizardStep - 1}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={closeWizard}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium nexo-text-secondary hover:text-[#ff5500] transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4 shrink-0" />
+                    <span>Voltar para o Portal</span>
+                  </button>
+                )}
 
-              <div className="flex items-center gap-3">
-                <span className="text-xs uppercase tracking-wider text-[#ff5500] font-semibold">
-                  {getWizardTitle(activeWizard)}
-                </span>
                 <button
                   type="button"
                   onClick={closeWizard}
-                  className="rounded-full nexo-elevated px-3 py-1.5 text-xs nexo-text-muted hover:text-[#ff5500] transition-colors"
+                  className="rounded-full nexo-elevated px-3 py-1.5 text-xs nexo-text-muted hover:text-[#ff5500] transition-colors shrink-0"
                 >
                   Cancelar
                 </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-wider text-[#ff5500] font-semibold break-words">
+                  {getWizardTitle(activeWizard)}
+                </span>
               </div>
             </div>
 
